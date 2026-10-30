@@ -93,7 +93,7 @@ Publishing is automated by `.github/workflows/release.yml`.
 2. `npm version <patch|minor|major>` (bumps package.json, commits, tags `vX.Y.Z`).
 3. `git push --follow-tags`
 
-The workflow runs the tests, publishes to npm with provenance, and creates the GitHub release from the CHANGELOG section. It needs an `NPM_TOKEN` repository secret (granular token, read and write on `@virling`, bypass 2FA) or npm trusted publishing configured for this repo.
+The workflow runs the tests, publishes to npm with provenance, and creates the GitHub release from the CHANGELOG section. It uses npm trusted publishing (OIDC), so no npm token is stored in the repo. The trusted publisher is configured on npmjs.com for `virling/agentmem` and `release.yml`.
 
 ## License of contributions
 
