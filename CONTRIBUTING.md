@@ -86,11 +86,13 @@ Auto-capture tests in the suite inject a fake model, so they never call Claude. 
 
 ## Releases (maintainers)
 
-1. Move the `[Unreleased]` entries in CHANGELOG.md under a new version heading.
+Publishing is automated by `.github/workflows/release.yml`.
+
+1. Move the `[Unreleased]` entries in CHANGELOG.md under a new version heading and commit.
 2. `npm version <patch|minor|major>` (bumps package.json, commits, tags `vX.Y.Z`).
 3. `git push --follow-tags`
-4. `npm publish`
-5. `gh release create vX.Y.Z --notes-file <changelog section>`
+
+The workflow runs the tests, publishes to npm with provenance, and creates the GitHub release from the CHANGELOG section. It needs an `NPM_TOKEN` repository secret (granular token, read and write on `@virling`, bypass 2FA) or npm trusted publishing configured for this repo.
 
 ## License of contributions
 
