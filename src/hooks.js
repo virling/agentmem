@@ -47,7 +47,7 @@ export async function runHook(event) {
   }
   if (event === "session-end") {
     if (!input.transcript_path) return;
-    const entry = fileURLToPath(new URL("./index.js", import.meta.url));
+    const entry = fileURLToPath(new URL("../bin/agentmem.js", import.meta.url));
     spawn(process.execPath, [entry, "capture", input.transcript_path], {
       cwd: input.cwd || process.cwd(),
       detached: true,

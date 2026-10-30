@@ -22,21 +22,29 @@ Use a throwaway store while developing so you do not touch your real memories:
 
 ```bash
 export AGENTMEM_HOME=$(mktemp -d)
-node index.js add "Test" "Hello" --type note
-node index.js list
+node bin/agentmem.js add "Test" "Hello" --type note
+node bin/agentmem.js list
 ```
 
 ## Code layout
 
-| File | Responsibility |
-|---|---|
-| `index.js` | CLI entry point and command dispatch |
-| `store.js` | Project id, Markdown read/write, search, duplicate check, secret scan, stale detection |
-| `mcp.js` | MCP server over stdio (JSON-RPC, newline-delimited) and tool definitions |
-| `hooks.js` | Claude Code hook handlers: session start, post tool use, session end |
-| `capture.js` | Transcript extraction and auto-capture through `claude -p` |
-| `install.js` | Adds hooks to Claude Code settings and registers the MCP server |
-| `store.test.js` | Test suite |
+```
+agentmem/
+├── bin/
+│   └── agentmem.js        CLI entry point and command dispatch
+├── src/
+│   ├── store.js           Project id, Markdown read/write, search, duplicate check, secret scan, stale detection
+│   ├── mcp.js             MCP server over stdio (JSON-RPC, newline-delimited) and tool definitions
+│   ├── hooks.js           Claude Code hooks: session start, post tool use, session end
+│   ├── capture.js         Transcript extraction and auto-capture through `claude -p`
+│   └── install.js         Adds hooks to Claude Code settings and registers the MCP server
+├── test/
+│   ├── helpers.js         Shared temp-folder helper
+│   └── *.test.js          One test file per module in src/
+└── .github/               CI workflow, issue and PR templates
+```
+
+Tests live in `test/<module>.test.js`, one file per module in `src/`. `npm test` runs them all.
 
 ## Testing an MCP change by hand
 
@@ -47,16 +55,16 @@ printf '%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"memory_list"}}' \
-  | node index.js mcp
+  | node bin/agentmem.js mcp
 ```
 
 ## Testing a hook by hand
 
 ```bash
-echo '{"cwd":"'"$PWD"'","session_id":"dev"}' | node index.js hook session-start
+echo '{"cwd":"'"$PWD"'","session_id":"dev"}' | node bin/agentmem.js hook session-start
 ```
 
-Auto-capture tests in the suite inject a fake model, so they never call Claude. To try the real thing, run `node index.js capture <transcript.jsonl>` against a store in a temp `AGENTMEM_HOME`.
+Auto-capture tests in the suite inject a fake model, so they never call Claude. To try the real thing, run `node bin/agentmem.js capture <transcript.jsonl>` against a store in a temp `AGENTMEM_HOME`.
 
 ## Adding a new agent integration
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { capture, logCapture } from "./capture.js";
-import { runHook } from "./hooks.js";
-import { install } from "./install.js";
-import { startServer } from "./mcp.js";
-import { Store, summary } from "./store.js";
+import { capture, logCapture } from "../src/capture.js";
+import { runHook } from "../src/hooks.js";
+import { install } from "../src/install.js";
+import { startServer } from "../src/mcp.js";
+import { Store, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
 

@@ -4,7 +4,7 @@
   "description": "Project-scoped local memory for AI coding agents over MCP",
   "type": "module",
   "bin": {
-    "agentmem": "./index.js"
+    "agentmem": "./bin/agentmem.js"
   },
   "scripts": {
     "test": "node --test"
@@ -25,8 +25,8 @@
     "url": "git+https://github.com/fixedbydev/agentmem.git"
   },
   "files": [
-    "*.js",
-    "!*.test.js",
+    "bin",
+    "src",
     "README.md",
     "LICENSE"
   ]

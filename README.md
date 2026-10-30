@@ -21,6 +21,7 @@ Project-scoped memory for AI coding agents. One local store per repository, shar
 - [Memory format](#memory-format)
 - [Configuration](#configuration)
 - [Sharing with a team](#sharing-with-a-team)
+- [Project structure](#project-structure)
 - [Troubleshooting](#troubleshooting)
 - [Uninstall](#uninstall)
 - [Contributing](#contributing)
@@ -69,7 +70,7 @@ This adds the three hooks to `~/.claude/settings.json` and registers the MCP ser
 To add only the MCP server, without hooks:
 
 ```bash
-claude mcp add agentmem --scope user -- node /absolute/path/to/agentmem/index.js mcp
+claude mcp add agentmem --scope user -- node /absolute/path/to/agentmem/bin/agentmem.js mcp
 ```
 
 ### Cursor
@@ -81,7 +82,7 @@ Add to `~/.cursor/mcp.json` (all projects) or `<project>/.cursor/mcp.json` (one 
   "mcpServers": {
     "agentmem": {
       "command": "node",
-      "args": ["/absolute/path/to/agentmem/index.js", "mcp"]
+      "args": ["/absolute/path/to/agentmem/bin/agentmem.js", "mcp"]
     }
   }
 }
@@ -94,7 +95,7 @@ If memories land under the wrong project, the editor started the server outside 
 Any client that can launch a stdio MCP server works. The command is:
 
 ```
-node /absolute/path/to/agentmem/index.js mcp
+node /absolute/path/to/agentmem/bin/agentmem.js mcp
 ```
 
 ### Tell the agent to use it
@@ -198,6 +199,18 @@ You can edit these files by hand. agentmem reads them fresh on every call.
 ## Sharing with a team
 
 agentmem is local-first. To share without git, point `AGENTMEM_HOME` at a synced folder (Dropbox, iCloud Drive, Google Drive). Every teammate who opens the same repo gets the same project id, so they read the same memories. One fact per file keeps sync conflicts rare.
+
+## Project structure
+
+```
+agentmem/
+├── bin/agentmem.js    CLI and MCP entry point
+├── src/               store, MCP server, hooks, auto-capture, installer
+├── test/              one test file per module (node:test)
+└── .github/           CI, issue and PR templates
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
 
 ## Troubleshooting
 
