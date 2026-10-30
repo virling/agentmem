@@ -1,0 +1,33 @@
+{
+  "name": "agentmem",
+  "version": "0.2.0",
+  "description": "Project-scoped local memory for AI coding agents over MCP",
+  "type": "module",
+  "bin": {
+    "agentmem": "./index.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "keywords": [
+    "mcp",
+    "memory",
+    "claude-code",
+    "cursor",
+    "ai-agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fixedbydev/agentmem.git"
+  },
+  "files": [
+    "*.js",
+    "!*.test.js",
+    "README.md",
+    "LICENSE"
+  ]
+}
