@@ -27,8 +27,8 @@ export function sessionStartContext(store) {
 }
 
 export function handoffText(m) {
-  const when = new Date(m.mtime).toISOString().slice(0, 16).replace("T", " ");
-  return `Handoff from ${m.agent || "unknown"} (${when} UTC), continue from here:\n${m.title}\n${m.body}`;
+  const when = new Date(m.mtime).toLocaleString("sv").slice(0, 16);
+  return `Handoff from ${m.agent || "unknown"} (${when}), continue from here:\n${m.title}\n${m.body}`;
 }
 
 export function fileContext(store, filePath, sessionId) {

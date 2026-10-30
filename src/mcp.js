@@ -102,7 +102,7 @@ const tools = [
 ];
 
 export function writeHandoff(store, { summary: done, next_steps, files, agent = "unknown" }) {
-  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const stamp = new Date().toLocaleString("sv").slice(0, 16);
   return store.write({ title: `Handoff ${stamp}`, content: `${done}\n\nNext steps:\n${next_steps}`, type: "handoff", files, agent });
 }
 
