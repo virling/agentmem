@@ -99,6 +99,6 @@ ${listing}`;
 }
 
 export function logCapture(store, transcriptPath, result) {
-  const line = `${new Date().toISOString()} ${path.basename(transcriptPath)} ${JSON.stringify(result)}\n`;
+  const line = `${new Date().toLocaleString("sv")} ${path.basename(transcriptPath)} ${JSON.stringify(result)}\n`;
   fs.appendFileSync(path.join(store.dir, "capture.log"), line);
 }
