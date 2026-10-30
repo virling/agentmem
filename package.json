@@ -7,7 +7,8 @@
     "agentmem": "bin/agentmem.js"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "version": "node scripts/sync-version.js && git add .claude-plugin"
   },
   "engines": {
     "node": ">=18"

@@ -1,0 +1,13 @@
+{
+  "name": "virling",
+  "owner": { "name": "Virling", "url": "https://github.com/virling" },
+  "metadata": { "description": "Plugins by Virling" },
+  "plugins": [
+    {
+      "name": "agentmem",
+      "version": "0.4.0",
+      "source": "./",
+      "description": "Project memory shared by every AI coding agent: team memory in git, guardrails, handoffs, auto-capture"
+    }
+  ]
+}
