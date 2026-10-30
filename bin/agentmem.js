@@ -3,7 +3,7 @@ import { capture, findConflicts, logCapture } from "../src/capture.js";
 import { exportRules } from "../src/export.js";
 import { runHook } from "../src/hooks.js";
 import { install } from "../src/install.js";
-import { startServer } from "../src/mcp.js";
+import { startServer, writeHandoff } from "../src/mcp.js";
 import { Store, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
@@ -16,6 +16,8 @@ const HELP = `agentmem: project memory for AI agents
   agentmem add <title> <content> [--type t] [--files a,b] [--tags x,y] [--guard warn|block] [--team] [--pin] [--force]
   agentmem edit <id> [--title t] [--content c] [--type t] [--files a,b] [--tags x,y] [--guard warn|block]
   agentmem verify <id>              mark a memory as still true for its current files
+  agentmem handoff <summary> <next steps> [--files a,b]
+                                    leave a note for the next session in any agent
   agentmem promote <id>             move a local memory into the repo's .agentmem/ folder
   agentmem pin <id> | unpin <id>
   agentmem rm <id>
@@ -70,6 +72,10 @@ async function main() {
       return console.log(`Updated ${store.update(positional[0], flags)}`);
     case "verify":
       return console.log(`Verified ${store.update(positional[0], {})}`);
+    case "handoff":
+      return console.log(
+        `Saved ${writeHandoff(store, { summary: positional[0], next_steps: positional[1], files: flags.files, agent: "cli" })}`
+      );
     case "promote":
       return console.log(`Promoted ${store.promote(positional[0])} to ${store.teamDir}. Commit it to share it.`);
     case "pin":

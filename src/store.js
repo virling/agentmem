@@ -4,7 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export const TYPES = ["decision", "convention", "gotcha", "todo", "note"];
+export const TYPES = ["decision", "convention", "gotcha", "todo", "note", "handoff"];
+const HANDOFF_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const GUARDS = ["warn", "block"];
 export const SCOPES = ["local", "team"];
 const LIST_FIELDS = ["files", "tags", "hashes"];
@@ -153,7 +154,8 @@ export class Store {
     this.validate({ type, guard });
     const dir = this.dirFor(scope);
     this.checkSecrets(title, content);
-    const dup = force ? null : this.similar(title);
+    if (type === "handoff") for (const old of this.list().filter((m) => m.type === "handoff" && m.scope === scope)) this.delete(old.id);
+    const dup = force || type === "handoff" ? null : this.similar(title);
     if (dup) throw new Error(`similar memory exists: ${dup.id} "${dup.title}". Use memory_update, or pass force: true`);
     fs.mkdirSync(dir, { recursive: true });
     const date = new Date().toLocaleDateString("sv");
@@ -203,9 +205,18 @@ export class Store {
           const changed = exact.filter(
             (p) => recorded[p] && !stale.includes(p) && recorded[p] !== fileHash(path.resolve(this.project.root, p))
           );
-          return { id: f.slice(0, -3), scope, ...meta, body, stale, changed };
+          const mtime = fs.statSync(path.join(dir, f)).mtimeMs;
+          return { id: f.slice(0, -3), scope, ...meta, body, stale, changed, mtime };
         });
     }).sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  latestHandoff() {
+    return (
+      this.list()
+        .filter((m) => m.type === "handoff" && Date.now() - m.mtime < HANDOFF_MAX_AGE_MS)
+        .sort((a, b) => b.mtime - a.mtime)[0] || null
+    );
   }
 
   read(id) {

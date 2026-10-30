@@ -29,7 +29,11 @@ export function buildPrompt(transcript, existingTitles) {
 
 Return ONLY a JSON array (no prose, no code fence). Each item: {"title": string, "content": string, "type": one of ${JSON.stringify(TYPES)}, "files": [repo-relative paths, optional]}.
 
-Keep only facts that will still matter in a future session: decisions and why, project conventions, gotchas and their fixes, open todos. Skip chit-chat, one-off debugging steps, anything already in the existing list, and anything secret. At most 5 items. Return [] if nothing qualifies.
+Keep only facts that will still matter in a future session: decisions and why, project conventions, gotchas and their fixes, open todos. Skip chit-chat, one-off debugging steps, anything already in the existing list, and anything secret. At most 5 items.
+
+If the session ended with work unfinished, add one extra item with type "handoff": title "Handoff: <task>", content saying what is done, then "Next steps:" and the remaining steps in order. Skip it if the work was finished.
+
+Return [] if nothing qualifies.
 
 Existing memories:
 ${existingTitles.length ? existingTitles.map((t) => `- ${t}`).join("\n") : "(none)"}

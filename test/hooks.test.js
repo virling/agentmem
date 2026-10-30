@@ -44,3 +44,17 @@ test("guards match through symlinked project paths", () => {
   store.write({ title: "No vendor edits", content: "Patch upstream.", files: ["vendor/**"], guard: "block" });
   assert.equal(guardDecision(store, path.join(link, "vendor/new-file.js")).permissionDecision, "deny");
 });
+
+test("latest handoff is shown first and replaces older ones", async () => {
+  const { writeHandoff } = await import("../src/mcp.js");
+  const store = new Store(tmp(), tmp());
+  store.write({ title: "Uses Postgres", content: "pg 16" });
+  writeHandoff(store, { summary: "Old work", next_steps: "old", agent: "claude-code" });
+  writeHandoff(store, { summary: "Refactored auth middleware", next_steps: "1. Add tests\n2. Update docs", agent: "claude-code" });
+  const handoffs = store.list().filter((m) => m.type === "handoff");
+  assert.equal(handoffs.length, 1);
+  const ctx = sessionStartContext(store);
+  assert.match(ctx, /Handoff from claude-code[\s\S]*Refactored auth middleware[\s\S]*Next steps:\n1\. Add tests/);
+  assert.ok(ctx.indexOf("Handoff from") < ctx.indexOf("Index:"));
+  assert.doesNotMatch(ctx, /Old work/);
+});

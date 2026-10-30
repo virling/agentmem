@@ -1,4 +1,5 @@
 import readline from "node:readline";
+import { handoffText } from "./hooks.js";
 import { GUARDS, SCOPES, Store, TYPES, summary } from "./store.js";
 
 const stores = new Map();
@@ -73,6 +74,22 @@ const tools = [
     },
   },
   {
+    name: "memory_handoff",
+    description:
+      "Leave a handoff note so the next session, in any agent, can continue this work. Call it when the user is switching agents or stopping mid-task. Replaces the previous handoff.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "What was being worked on and what is done" },
+        next_steps: { type: "string", description: "What to do next, in order" },
+        files: { type: "array", items: { type: "string" } },
+        agent: { type: "string" },
+        project_path: projectPath,
+      },
+      required: ["summary", "next_steps"],
+    },
+  },
+  {
     name: "memory_promote",
     description: "Move a local memory into the team folder (.agentmem/ in the repo) so it can be committed and shared.",
     inputSchema: { type: "object", properties: { id: { type: "string" }, project_path: projectPath }, required: ["id"] },
@@ -84,12 +101,20 @@ const tools = [
   },
 ];
 
+export function writeHandoff(store, { summary: done, next_steps, files, agent = "unknown" }) {
+  const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+  return store.write({ title: `Handoff ${stamp}`, content: `${done}\n\nNext steps:\n${next_steps}`, type: "handoff", files, agent });
+}
+
 function call(name, args = {}) {
   const store = storeFor(args.project_path);
   switch (name) {
     case "memory_list": {
       const all = store.list();
-      return all.length ? `${all.length} memories for ${store.project.name}:\n${all.map(summary).join("\n")}` : "No memories yet.";
+      if (!all.length) return "No memories yet.";
+      const handoff = store.latestHandoff();
+      const head = handoff ? `${handoffText(handoff)}\n\n` : "";
+      return `${head}${all.length} memories for ${store.project.name}:\n${all.map(summary).join("\n")}`;
     }
     case "memory_search": {
       const hits = store.search(args.query);
@@ -104,6 +129,8 @@ function call(name, args = {}) {
         ? `Saved ${id}\nRelated memories, check none of them contradict the new one (update or delete if they do):\n${related.map(summary).join("\n")}`
         : `Saved ${id}`;
     }
+    case "memory_handoff":
+      return `Saved handoff ${writeHandoff(store, args)}. The next session in any agent will see it first.`;
     case "memory_promote":
       return `Promoted ${store.promote(args.id)} to ${store.teamDir}. Commit it to share with the team.`;
     case "memory_update":

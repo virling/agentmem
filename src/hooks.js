@@ -14,14 +14,21 @@ function output(event, context) {
 export function sessionStartContext(store) {
   const all = store.list();
   if (!all.length) return `agentmem: no memories yet for ${store.project.name}. Save durable decisions, conventions and gotchas with memory_write.`;
-  const pinned = all.filter((m) => m.pinned);
-  const rest = all.filter((m) => !m.pinned).slice(-INDEX_LIMIT);
+  const handoff = store.latestHandoff();
+  const pinned = all.filter((m) => m.pinned && m.id !== handoff?.id);
+  const rest = all.filter((m) => !m.pinned && m.type !== "handoff").slice(-INDEX_LIMIT);
   const lines = [`agentmem: ${all.length} memories for ${store.project.name}. Use memory_read for details, memory_write for new facts.`];
+  if (handoff) lines.push("", handoffText(handoff));
   if (pinned.length) lines.push("", "Pinned:", ...pinned.map((m) => `${summary(m)}\n  ${m.body}`));
   if (rest.length) lines.push("", "Index:", ...rest.map(summary));
   if (all.some((m) => m.stale.length || m.changed.length))
     lines.push("", "Some memories reference files that are missing or changed since they were written: check them, then memory_update (re-verifies) or memory_delete.");
   return lines.join("\n");
+}
+
+export function handoffText(m) {
+  const when = new Date(m.mtime).toISOString().slice(0, 16).replace("T", " ");
+  return `Handoff from ${m.agent || "unknown"} (${when} UTC), continue from here:\n${m.title}\n${m.body}`;
 }
 
 export function fileContext(store, filePath, sessionId) {
