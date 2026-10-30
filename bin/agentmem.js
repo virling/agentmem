@@ -7,7 +7,7 @@ import { Store, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
 
-  agentmem install                  add hooks and the MCP server to Claude Code
+  agentmem install [agent...]       configure detected agents (claude, cursor, windsurf, gemini, codex)
   agentmem mcp                      start the MCP server (default when stdin is piped)
   agentmem list                     list memories for this project
   agentmem search <query>
@@ -35,7 +35,7 @@ async function main() {
   const [command, ...rest] = process.argv.slice(2);
   if (command === "mcp" || (!command && !process.stdin.isTTY)) return startServer();
   if (command === "hook") return runHook(rest[0]);
-  if (command === "install") return install();
+  if (command === "install") return install(rest);
 
   const { positional, flags } = parseArgs(rest);
   const store = new Store(process.cwd());
