@@ -13,7 +13,7 @@ Thanks for helping. This guide covers setup, the code layout, and what a good pu
 ## Setup
 
 ```bash
-git clone https://github.com/<you>/agentmem.git
+git clone https://github.com/<you>/agentmem.git  # your fork of virling/agentmem
 cd agentmem
 npm test
 ```
@@ -82,6 +82,15 @@ Auto-capture tests in the suite inject a fake model, so they never call Claude. 
 - Commit subject in plain imperative mood, under 60 characters. Example: `Add tag filter to memory_search`.
 - PR description: what changed, why, and how you tested it.
 - Make sure `npm test` passes before opening the PR.
+- Add a line under `## [Unreleased]` in CHANGELOG.md for any user-facing change.
+
+## Releases (maintainers)
+
+1. Move the `[Unreleased]` entries in CHANGELOG.md under a new version heading.
+2. `npm version <patch|minor|major>` (bumps package.json, commits, tags `vX.Y.Z`).
+3. `git push --follow-tags`
+4. `npm publish`
+5. `gh release create vX.Y.Z --notes-file <changelog section>`
 
 ## License of contributions
 

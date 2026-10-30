@@ -12,6 +12,7 @@ Project-scoped memory for AI coding agents. One local store per repository, shar
 
 - [How it works](#how-it-works)
 - [Requirements](#requirements)
+- [Changelog](#changelog)
 - [Install](#install)
 - [Connect your agents](#connect-your-agents)
 - [MCP tools](#mcp-tools)
@@ -46,57 +47,72 @@ Other agent ─┘
 - git (optional, used to identify the project)
 - Claude Code CLI (optional, only for hooks and auto-capture)
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) and [GitHub releases](https://github.com/virling/agentmem/releases).
+
 ## Install
 
+One line. Detects Claude Code, Cursor, Windsurf, Gemini CLI and Codex on your machine and configures each one:
+
 ```bash
-git clone https://github.com/fixedbydev/agentmem.git
-cd agentmem
-npm link          # puts the agentmem command on your PATH
-npm test          # optional, runs the test suite
+npx -y @virling/agentmem install
 ```
 
-No `npm install` is needed. There are no dependencies.
+Or install globally first (faster hooks, `agentmem` on your PATH):
+
+```bash
+npm i -g @virling/agentmem && agentmem install
+```
+
+Configure only specific agents:
+
+```bash
+agentmem install claude cursor
+```
+
+Restart your agents afterwards. Running `install` again is safe: it updates existing entries instead of adding duplicates.
 
 ## Connect your agents
 
-### Claude Code
+`agentmem install` writes these for you. The details are here if you prefer to do it by hand.
 
-```bash
-agentmem install
-```
+| Agent | What `install` changes |
+|---|---|
+| Claude Code | `claude mcp add agentmem --scope user`, plus three hooks in `~/.claude/settings.json` |
+| Cursor | `mcpServers.agentmem` in `~/.cursor/mcp.json` |
+| Windsurf | `mcpServers.agentmem` in `~/.codeium/windsurf/mcp_config.json` |
+| Gemini CLI | `mcpServers.agentmem` in `~/.gemini/settings.json` |
+| Codex | `[mcp_servers.agentmem]` in `~/.codex/config.toml` |
 
-This adds the three hooks to `~/.claude/settings.json` and registers the MCP server at user scope. It is safe to run twice. Restart Claude Code afterwards.
+Other keys and other MCP servers in those files are left as they are.
 
-To add only the MCP server, without hooks:
+### Any other MCP client
 
-```bash
-claude mcp add agentmem --scope user -- node /absolute/path/to/agentmem/bin/agentmem.js mcp
-```
-
-### Cursor
-
-Add to `~/.cursor/mcp.json` (all projects) or `<project>/.cursor/mcp.json` (one project):
+Any client that can launch a stdio MCP server works:
 
 ```json
 {
   "mcpServers": {
-    "agentmem": {
-      "command": "node",
-      "args": ["/absolute/path/to/agentmem/bin/agentmem.js", "mcp"]
-    }
+    "agentmem": { "command": "npx", "args": ["-y", "@virling/agentmem", "mcp"] }
   }
 }
 ```
 
-If memories land under the wrong project, the editor started the server outside your project folder. Ask the agent to pass `project_path` (the absolute project path) on its tool calls, or use the per-project config file.
+### Editors that start servers outside the project
 
-### Other MCP clients
+If memories land under the wrong project, the editor started the server outside your project folder. Ask the agent to pass `project_path` (the absolute project path) on its tool calls, or use the editor's per-project MCP config.
 
-Any client that can launch a stdio MCP server works. The command is:
+### From source
 
+```bash
+git clone https://github.com/virling/agentmem.git
+cd agentmem
+npm test
+node bin/agentmem.js install
 ```
-node /absolute/path/to/agentmem/bin/agentmem.js mcp
-```
+
+There are no dependencies, so no `npm install` is needed.
 
 ### Tell the agent to use it
 
@@ -224,8 +240,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
 
 1. Remove the three `agentmem` hook entries from `~/.claude/settings.json`.
 2. `claude mcp remove agentmem --scope user`
-3. `npm unlink -g agentmem`
-4. Optional: `rm -rf ~/.agentmem` deletes all memories.
+3. Remove the `agentmem` entry from each other agent's MCP config listed in [Connect your agents](#connect-your-agents).
+4. `npm rm -g @virling/agentmem` if you installed it globally.
+5. Optional: `rm -rf ~/.agentmem` deletes all memories.
 
 ## Contributing
 
@@ -233,4 +250,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[PolyForm Noncommercial 1.0.0](LICENSE). Free for personal, research, educational and other noncommercial use. Selling agentmem or using it commercially requires a separate license from the author: open an issue or contact [fixedbydev](https://github.com/fixedbydev).
+[PolyForm Noncommercial 1.0.0](LICENSE). Free for personal, research, educational and other noncommercial use. Selling agentmem or using it commercially requires a separate license from the author: open an issue or contact [Virling](https://github.com/virling).

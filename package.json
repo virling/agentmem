@@ -1,6 +1,6 @@
 {
-  "name": "agentmem",
-  "version": "0.2.0",
+  "name": "@virling/agentmem",
+  "version": "0.3.0",
   "description": "Project-scoped local memory for AI coding agents over MCP",
   "type": "module",
   "bin": {
@@ -22,12 +22,20 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fixedbydev/agentmem.git"
+    "url": "git+https://github.com/virling/agentmem.git"
   },
   "files": [
     "bin",
     "src",
     "README.md",
-    "LICENSE"
-  ]
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "homepage": "https://github.com/virling/agentmem#readme",
+  "bugs": {
+    "url": "https://github.com/virling/agentmem/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

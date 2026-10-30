@@ -99,7 +99,7 @@ function handle(msg) {
       return {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "agentmem", version: "0.2.0" },
+        serverInfo: { name: "agentmem", version: "0.3.0" },
       };
     case "ping":
       return {};
