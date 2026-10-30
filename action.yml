@@ -1,0 +1,56 @@
+name: agentmem PR memory
+description: Turn decisions from merged pull requests into team memories, opened as a pull request for review
+author: Virling
+branding:
+  icon: book-open
+  color: purple
+
+inputs:
+  anthropic-api-key:
+    description: Anthropic API key
+    required: true
+  model:
+    description: Claude model used to extract memories
+    default: claude-opus-5-5
+  github-token:
+    description: Token used to read the pull request and open the memory pull request
+    default: ${{ github.token }}
+
+outputs:
+  saved:
+    description: Number of memories saved
+    value: ${{ steps.capture.outputs.saved }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - name: Install Anthropic SDK for the action
+      shell: bash
+      run: npm install --prefix "$GITHUB_ACTION_PATH" --no-save --no-package-lock --silent @anthropic-ai/sdk@1.3.0
+    - name: Extract memories
+      id: capture
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        AGENTMEM_MODEL: ${{ inputs.model }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: node "$GITHUB_ACTION_PATH/bin/agentmem.js" pr-capture
+    - name: Open a pull request with the new memories
+      if: steps.capture.outputs.saved != '' && steps.capture.outputs.saved != '0'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: |
+        BRANCH="agentmem/pr-$PR_NUMBER"
+        git config user.name "agentmem[bot]"
+        git config user.email "agentmem@users.noreply.github.com"
+        git checkout -b "$BRANCH"
+        git add .agentmem
+        git commit -m "Add memories from #$PR_NUMBER"
+        git push origin "$BRANCH"
+        gh pr create --head "$BRANCH" --title "agentmem: memories from #$PR_NUMBER" \
+          --body "Memories extracted from #$PR_NUMBER by agentmem. Edit or delete any that are wrong, then merge."

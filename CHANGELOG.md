@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Claude Code plugin: `/plugin marketplace add virling/agentmem` then `/plugin install agentmem@virling`.
+- Cross-agent handoffs: `memory_handoff`, `agentmem handoff`, and auto-capture writes one when a session ends mid-task. The latest handoff is shown first at session start and in `memory_list`.
+- `agentmem install` configures VS Code (Copilot) and OpenCode.
+- PR memory GitHub Action (`virling/agentmem@v0`): extracts decisions from merged pull requests and opens a pull request adding them to `.agentmem/`.
+
+### Changed
+
+- Times in handoffs and `capture.log` use local time.
+
 ## [0.4.0] - 2026-10-31
 
 ### Added

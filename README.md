@@ -4,13 +4,15 @@ Memory that lives with your code: reviewed in pull requests, enforced as guardra
 
 - **Zero dependencies.** Plain Node.js, MCP over stdio, memories stored as Markdown files.
 - **Per project.** Memory is keyed by the git remote URL, so every clone of the same repo shares one memory.
-- **Works across agents.** Claude Code, Cursor, Windsurf, Codex, Gemini CLI, or anything with MCP support.
+- **Works across agents.** Claude Code, Cursor, Windsurf, Codex, Gemini CLI, VS Code (Copilot), OpenCode, or anything with MCP support.
+- **Handoffs.** Stop mid-task in one agent, continue in another: the next session starts with what was done and what is next.
 - **Automatic in Claude Code.** Hooks inject memory at session start, surface notes when a linked file is opened, and auto-capture new facts when a session ends.
 - **Team memory in git.** Team memories live in `.agentmem/` in your repo, so they are reviewed in PRs and shared on `git pull`.
 - **Guardrails.** Turn a memory into a rule: agents are blocked or asked before editing matching files.
 - **Code-aware.** Memories linked to files are flagged when those files change, so outdated knowledge does not linger.
 - **Export to rule files.** Compile team memories into `AGENTS.md`, `CLAUDE.md`, Copilot and Cursor rules for agents without MCP.
 - **Contradiction checks.** New memories come back with related ones to compare, and `agentmem check` finds conflicts.
+- **PR memory Action.** A GitHub Action turns decisions from merged pull requests into team memories, opened as a PR for review.
 - **Safe by default.** Writes that look like secrets are refused. Near-duplicate titles are refused unless forced.
 
 ## Contents
@@ -29,6 +31,8 @@ Memory that lives with your code: reviewed in pull requests, enforced as guardra
 - [Code-aware staleness](#code-aware-staleness)
 - [Export to rule files](#export-to-rule-files)
 - [Contradiction checks](#contradiction-checks)
+- [Handoffs between agents](#handoffs-between-agents)
+- [PR memory GitHub Action](#pr-memory-github-action)
 - [Memory format](#memory-format)
 - [Configuration](#configuration)
 - [Sharing with a team](#sharing-with-a-team)
@@ -63,7 +67,7 @@ See [CHANGELOG.md](CHANGELOG.md) and [GitHub releases](https://github.com/virlin
 
 ## Install
 
-One line. Detects Claude Code, Cursor, Windsurf, Gemini CLI and Codex on your machine and configures each one:
+One line. Detects Claude Code, Cursor, Windsurf, Gemini CLI, Codex, VS Code and OpenCode on your machine and configures each one:
 
 ```bash
 npx -y @virling/agentmem install
@@ -83,17 +87,28 @@ agentmem install claude cursor
 
 Restart your agents afterwards. Running `install` again is safe: it updates existing entries instead of adding duplicates.
 
+### As a Claude Code plugin
+
+```
+/plugin marketplace add virling/agentmem
+/plugin install agentmem@virling
+```
+
+The plugin brings the MCP server and all hooks. Use either the plugin or `agentmem install claude`, not both, or every hook runs twice.
+
 ## Connect your agents
 
 `agentmem install` writes these for you. The details are here if you prefer to do it by hand.
 
 | Agent | What `install` changes |
 |---|---|
-| Claude Code | `claude mcp add agentmem --scope user`, plus three hooks in `~/.claude/settings.json` |
+| Claude Code | `claude mcp add agentmem --scope user`, plus four hooks in `~/.claude/settings.json` |
 | Cursor | `mcpServers.agentmem` in `~/.cursor/mcp.json` |
 | Windsurf | `mcpServers.agentmem` in `~/.codeium/windsurf/mcp_config.json` |
 | Gemini CLI | `mcpServers.agentmem` in `~/.gemini/settings.json` |
 | Codex | `[mcp_servers.agentmem]` in `~/.codex/config.toml` |
+| VS Code (Copilot) | `servers.agentmem` in the user `mcp.json` (`~/Library/Application Support/Code/User/` on macOS, `~/.config/Code/User/` on Linux, `%APPDATA%\Code\User\` on Windows) |
+| OpenCode | `mcp.agentmem` in `~/.config/opencode/opencode.json` |
 
 Other keys and other MCP servers in those files are left as they are.
 
@@ -142,11 +157,12 @@ At the start of each task call memory_list. Save durable decisions, conventions 
 | `memory_write` | `title`, `content`, `type`, `files`, `tags`, `pinned`, `guard`, `scope`, `agent`, `force` | Save one fact. Returns related memories to check for contradictions |
 | `memory_update` | `id` plus any field to change | Edit a memory in place. With only `id`, re-verifies it against its files |
 | `memory_promote` | `id` | Move a local memory into the repo's `.agentmem/` folder |
+| `memory_handoff` | `summary`, `next_steps`, `files`, `agent` | Leave a note for the next session in any agent. Replaces the previous handoff |
 | `memory_delete` | `id` | Remove a memory |
 
 Every tool also accepts an optional `project_path`.
 
-Types: `decision`, `convention`, `gotcha`, `todo`, `note`. Scopes: `local` (default), `team`. Guards: `warn`, `block`.
+Types: `decision`, `convention`, `gotcha`, `todo`, `note`, `handoff`. Scopes: `local` (default), `team`. Guards: `warn`, `block`.
 
 ## CLI
 
@@ -164,6 +180,7 @@ agentmem rm 2026-10-31-use-pnpm
 agentmem add "Generated code" "Run pnpm codegen" --files "src/gen/**" --guard block --team
 agentmem promote 2026-10-31-use-pnpm
 agentmem verify 2026-10-31-api-returns-json
+agentmem handoff "Refactored auth middleware" "1. Add tests 2. Update docs"
 agentmem export agents cursor
 agentmem check
 agentmem path        # prints this project's local and team folders
@@ -177,7 +194,7 @@ Run `agentmem` with no arguments in a terminal to see the full help.
 
 | Hook | What it does |
 |---|---|
-| `SessionStart` | Injects pinned memories in full, plus an index of the 50 most recent others. Flags stale and changed memories. |
+| `SessionStart` | Injects the latest handoff and pinned memories in full, plus an index of the 50 most recent others. Flags stale and changed memories. |
 | `PreToolUse` (Edit, Write, MultiEdit, NotebookEdit) | Enforces guardrails: denies edits to files under a `block` memory, asks first for `warn`. |
 | `PostToolUse` (Read, Edit, Write, MultiEdit) | When a file is touched, injects memories whose `files` list includes it. Each memory is shown once per session. |
 | `SessionEnd` | Starts auto-capture in the background. Does not block exit. |
@@ -188,7 +205,7 @@ When a Claude Code session ends, agentmem:
 
 1. Reads the session transcript (user and assistant text only, last 40k characters).
 2. Sends it to `claude -p --model haiku` with no tools and no MCP servers.
-3. Saves up to 5 durable facts with `agent: auto-capture`. Secrets and near-duplicates are skipped.
+3. Saves up to 5 durable facts with `agent: auto-capture`. Secrets and near-duplicates are skipped. If work was left unfinished, it also writes a [handoff](#handoffs-between-agents).
 4. Appends the result to `capture.log` in the project's storage folder.
 
 Run it by hand on any transcript:
@@ -266,6 +283,53 @@ $ agentmem check
 - 2026-10-31-package-manager-is-pnpm vs 2026-10-31-use-npm-for-installs: One says always use pnpm, the other says run npm install in CI.
 ```
 
+## Handoffs between agents
+
+Stop in one agent and continue in another without re-explaining:
+
+- In Claude Code, auto-capture writes a handoff when a session ends with work unfinished.
+- Any agent can call `memory_handoff` (for example when you say "hand this off, I'm switching to Cursor").
+- From the terminal: `agentmem handoff "<what is done>" "<next steps>"`.
+
+The latest handoff from the last 7 days is shown first at the next session start, and at the top of `memory_list` in agents without hooks. Writing a new handoff replaces the old one.
+
+## PR memory GitHub Action
+
+Turn decisions made in pull request reviews into team memories. Add this workflow to your repo as `.github/workflows/agentmem.yml`:
+
+```yaml
+name: agentmem
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  memories:
+    if: github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - uses: virling/agentmem@v0
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+When a pull request is merged, the action reads its description, reviews and comments, asks Claude for decisions, conventions and gotchas worth keeping, and opens a pull request that adds them to `.agentmem/`. Your team reviews that pull request like any other.
+
+| Input | Default | Purpose |
+|---|---|---|
+| `anthropic-api-key` | required | Anthropic API key, stored as a repository secret |
+| `model` | `claude-opus-5-5` | Claude model used for extraction |
+| `github-token` | `github.token` | Reads the pull request and opens the memory pull request |
+
+Your repository must allow GitHub Actions to create pull requests (Settings, Actions, General, Workflow permissions).
+
 ## Memory format
 
 ```markdown
@@ -309,9 +373,12 @@ The recommended way is [team memory](#team-memory) in git. To share local memori
 ```
 agentmem/
 ├── bin/agentmem.js    CLI and MCP entry point
-├── src/               store, MCP server, hooks, auto-capture, installer
+├── src/               store, MCP server, hooks, auto-capture, installer, export, PR capture
 ├── test/              one test file per module (node:test)
-└── .github/           CI, issue and PR templates
+├── hooks/             Claude Code plugin hooks
+├── .claude-plugin/    Claude Code plugin and marketplace manifests
+├── action.yml         PR memory GitHub Action
+└── .github/           CI, release workflow, issue and PR templates
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
@@ -326,7 +393,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
 
 ## Uninstall
 
-1. Remove the three `agentmem` hook entries from `~/.claude/settings.json`.
+1. Remove the four `agentmem` hook entries from `~/.claude/settings.json`, or `/plugin uninstall agentmem@virling` if you used the plugin.
 2. `claude mcp remove agentmem --scope user`
 3. Remove the `agentmem` entry from each other agent's MCP config listed in [Connect your agents](#connect-your-agents).
 4. `npm rm -g @virling/agentmem` if you installed it globally.

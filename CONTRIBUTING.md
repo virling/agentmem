@@ -38,11 +38,15 @@ agentmem/
 │   ├── hooks.js           Claude Code hooks: session start, post tool use, session end
 │   ├── capture.js         Transcript extraction and auto-capture through `claude -p`
 │   ├── install.js         Configures Claude Code, Cursor, Windsurf, Gemini CLI and Codex
-│   └── export.js          Writes team memories into AGENTS.md, CLAUDE.md, Copilot and Cursor rules
+│   ├── export.js          Writes team memories into AGENTS.md, CLAUDE.md, Copilot and Cursor rules
+│   └── pr-capture.js      PR memory GitHub Action: reads a merged PR and saves team memories
 ├── test/
 │   ├── helpers.js         Shared temp-folder helper
 │   └── *.test.js          One test file per module in src/
-└── .github/               CI workflow, issue and PR templates
+├── hooks/hooks.json       Claude Code plugin hooks
+├── .claude-plugin/        Plugin and marketplace manifests (versions synced by scripts/sync-version.js)
+├── action.yml             PR memory GitHub Action
+└── .github/               CI and release workflows, issue and PR templates
 ```
 
 Tests live in `test/<module>.test.js`, one file per module in `src/`. `npm test` runs them all.

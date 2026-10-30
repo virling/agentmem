@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+import fs from "node:fs";
 import { capture, findConflicts, logCapture } from "../src/capture.js";
 import { exportRules } from "../src/export.js";
 import { runHook } from "../src/hooks.js";
 import { install } from "../src/install.js";
 import { startServer, writeHandoff } from "../src/mcp.js";
+import { capturePullRequest, prFromEvent } from "../src/pr-capture.js";
 import { Store, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
@@ -26,7 +28,8 @@ const HELP = `agentmem: project memory for AI agents
   agentmem check                    find contradicting memories (uses claude -p)
   agentmem path                     print the storage folders for this project
   agentmem hook <session-start|pre-tool-use|post-tool-use|session-end>
-  agentmem capture <transcript.jsonl>`;
+  agentmem capture <transcript.jsonl>
+  agentmem pr-capture               (GitHub Actions) save team memories from the merged pull request`;
 
 const BOOLEAN_FLAGS = ["pin", "force", "team", "include-local"];
 
@@ -99,6 +102,19 @@ async function main() {
       const result = capture(store, positional[0]);
       logCapture(store, positional[0], result);
       return console.log(JSON.stringify(result));
+    }
+    case "pr-capture": {
+      const pr = prFromEvent();
+      if (!pr.merged) return console.log(`Pull request #${pr.number} was not merged, skipping.`);
+      const result = await capturePullRequest(store, {
+        repo: process.env.GITHUB_REPOSITORY,
+        number: pr.number,
+        token: process.env.GITHUB_TOKEN,
+        model: process.env.AGENTMEM_MODEL || "claude-opus-5-5",
+      });
+      console.log(JSON.stringify(result, null, 2));
+      if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `saved=${result.saved.length}\n`);
+      return;
     }
     default:
       console.log(HELP);
