@@ -37,7 +37,8 @@ agentmem/
 │   ├── mcp.js             MCP server over stdio (JSON-RPC, newline-delimited) and tool definitions
 │   ├── hooks.js           Claude Code hooks: session start, post tool use, session end
 │   ├── capture.js         Transcript extraction and auto-capture through `claude -p`
-│   └── install.js         Adds hooks to Claude Code settings and registers the MCP server
+│   ├── install.js         Configures Claude Code, Cursor, Windsurf, Gemini CLI and Codex
+│   └── export.js          Writes team memories into AGENTS.md, CLAUDE.md, Copilot and Cursor rules
 ├── test/
 │   ├── helpers.js         Shared temp-folder helper
 │   └── *.test.js          One test file per module in src/

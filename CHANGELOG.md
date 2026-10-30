@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-31
+
+### Added
+
+- Team memory: `scope: "team"` stores memories in the repo's `.agentmem/` folder so they are reviewed in PRs and shared through git. `agentmem promote` and `memory_promote` move local memories there.
+- Guardrails: memories with `guard: warn|block` and file globs are enforced by a new `PreToolUse` hook in Claude Code.
+- Code-aware staleness: memories store a content hash of linked files and are flagged `changed since written` when those files change. `agentmem verify` records the new version.
+- `agentmem export` writes team memories into `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` and `.cursor/rules/agentmem.mdc`.
+- Contradiction checks: writes return related memories, and `agentmem check` finds contradicting pairs with Haiku.
+- npm tokens are now caught by the secret scan.
+
+### Fixed
+
+- File-linked hints and guardrails now match when the project is opened through a symlinked path.
+
 ## [0.3.0] - 2026-10-31
 
 ### Added
@@ -43,6 +58,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/virling/agentmem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/virling/agentmem/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/virling/agentmem/releases/tag/v0.2.0
