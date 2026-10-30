@@ -1,5 +1,5 @@
 import readline from "node:readline";
-import { Store, TYPES, summary } from "./store.js";
+import { GUARDS, SCOPES, Store, TYPES, summary } from "./store.js";
 
 const stores = new Map();
 function storeFor(projectPath) {
@@ -19,6 +19,11 @@ const fields = {
   files: { type: "array", items: { type: "string" }, description: "Repo-relative files this memory is about" },
   tags: { type: "array", items: { type: "string" } },
   pinned: { type: "boolean", description: "Always show this memory at session start" },
+  guard: {
+    type: "string",
+    enum: GUARDS,
+    description: "Turn this memory into a guardrail for its files (globs allowed): warn asks before edits, block denies them",
+  },
 };
 
 const tools = [
@@ -46,6 +51,11 @@ const tools = [
       properties: {
         ...fields,
         agent: { type: "string", description: "Which agent is writing, e.g. claude-code, cursor" },
+        scope: {
+          type: "string",
+          enum: SCOPES,
+          description: "local (default, private to this machine) or team (stored in the repo's .agentmem/ folder and committed)",
+        },
         force: { type: "boolean", description: "Save even if a memory with a similar title exists" },
         project_path: projectPath,
       },
@@ -54,12 +64,18 @@ const tools = [
   },
   {
     name: "memory_update",
-    description: "Change an existing memory. Only the fields you pass are changed.",
+    description:
+      "Change an existing memory. Only the fields you pass are changed. Calling it with just the id re-verifies the memory against its current files.",
     inputSchema: {
       type: "object",
       properties: { id: { type: "string" }, ...fields, project_path: projectPath },
       required: ["id"],
     },
+  },
+  {
+    name: "memory_promote",
+    description: "Move a local memory into the team folder (.agentmem/ in the repo) so it can be committed and shared.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, project_path: projectPath }, required: ["id"] },
   },
   {
     name: "memory_delete",
@@ -81,8 +97,15 @@ function call(name, args = {}) {
     }
     case "memory_read":
       return store.read(args.id);
-    case "memory_write":
-      return `Saved ${store.write(args)}`;
+    case "memory_write": {
+      const id = store.write(args);
+      const related = store.related(args, id);
+      return related.length
+        ? `Saved ${id}\nRelated memories, check none of them contradict the new one (update or delete if they do):\n${related.map(summary).join("\n")}`
+        : `Saved ${id}`;
+    }
+    case "memory_promote":
+      return `Promoted ${store.promote(args.id)} to ${store.teamDir}. Commit it to share with the team.`;
     case "memory_update":
       return `Updated ${store.update(args.id, args)}`;
     case "memory_delete":
@@ -99,7 +122,7 @@ function handle(msg) {
       return {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "agentmem", version: "0.3.0" },
+        serverInfo: { name: "agentmem", version: "0.4.0" },
       };
     case "ping":
       return {};

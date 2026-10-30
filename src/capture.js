@@ -38,12 +38,13 @@ Transcript:
 ${transcript}`;
 }
 
-export function parseItems(output) {
+export function parseItems(output, raw = false) {
   const start = output.indexOf("[");
   const end = output.lastIndexOf("]");
   if (start < 0 || end < start) return [];
   const items = JSON.parse(output.slice(start, end + 1));
-  return Array.isArray(items) ? items.filter((i) => i && i.title && i.content) : [];
+  if (!Array.isArray(items)) return [];
+  return raw ? items.filter(Boolean) : items.filter((i) => i && i.title && i.content);
 }
 
 export function capture(store, transcriptPath, runModel = askClaude) {
@@ -62,7 +63,7 @@ export function capture(store, transcriptPath, runModel = askClaude) {
   return { saved, skipped };
 }
 
-function askClaude(prompt) {
+export function askClaude(prompt) {
   return execFileSync(
     "claude",
     ["-p", "--model", "haiku", "--tools", "", "--strict-mcp-config", "--no-session-persistence"],
@@ -74,6 +75,22 @@ function askClaude(prompt) {
       maxBuffer: 10 * 1024 * 1024,
       env: { ...process.env, AGENTMEM_CAPTURE: "1" },
     }
+  );
+}
+
+export function findConflicts(store, runModel = askClaude) {
+  const all = store.list();
+  if (all.length < 2) return [];
+  const listing = all.map((m) => `[${m.id}] (${m.type}) ${m.title}: ${m.body.replace(/\n+/g, " ")}`).join("\n");
+  const prompt = `Find pairs of project memories that contradict each other (they cannot both be true or both be followed).
+
+Return ONLY a JSON array (no prose, no code fence). Each item: {"ids": [id1, id2], "reason": one short sentence}. Return [] if none.
+
+Memories:
+${listing}`;
+  const known = new Set(all.map((m) => m.id));
+  return parseItems(runModel(prompt), true).filter(
+    (c) => Array.isArray(c.ids) && c.ids.length === 2 && c.ids.every((id) => known.has(id))
   );
 }
 

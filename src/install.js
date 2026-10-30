@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const HOOKS = [
   { event: "SessionStart", arg: "session-start" },
+  { event: "PreToolUse", arg: "pre-tool-use", matcher: "Edit|Write|MultiEdit|NotebookEdit" },
   { event: "PostToolUse", arg: "post-tool-use", matcher: "Read|Edit|Write|MultiEdit" },
   { event: "SessionEnd", arg: "session-end" },
 ];

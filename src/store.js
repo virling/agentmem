@@ -5,13 +5,17 @@ import os from "node:os";
 import path from "node:path";
 
 export const TYPES = ["decision", "convention", "gotcha", "todo", "note"];
-const LIST_FIELDS = ["files", "tags"];
+export const GUARDS = ["warn", "block"];
+export const SCOPES = ["local", "team"];
+const LIST_FIELDS = ["files", "tags", "hashes"];
+const TEAM_DIR = ".agentmem";
 
 const SECRET_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
   /AKIA[0-9A-Z]{16}/,
   /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}/,
   /github_pat_[A-Za-z0-9_]{30,}/,
+  /\bnpm_[A-Za-z0-9]{30,}/,
   /xox[abprs]-[A-Za-z0-9-]{10,}/,
   /AIza[0-9A-Za-z_-]{35}/,
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
@@ -47,6 +51,27 @@ function words(text) {
   return new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
 }
 
+function overlap(a, b) {
+  const shared = [...a].filter((w) => b.has(w)).length;
+  return shared / (new Set([...a, ...b]).size || 1);
+}
+
+const isGlob = (p) => /[*?]/.test(p);
+
+export function globToRegex(pattern) {
+  const re = pattern
+    .split(/(\*\*\/|\*\*|\*|\?)/)
+    .map((part) =>
+      part === "**/" ? "(?:.*/)?" : part === "**" ? ".*" : part === "*" ? "[^/]*" : part === "?" ? "[^/]" : part.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    )
+    .join("");
+  return new RegExp(`^${re}$`);
+}
+
+function fileHash(file) {
+  return createHash("sha1").update(fs.readFileSync(file)).digest("hex").slice(0, 12);
+}
+
 function parse(raw) {
   const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   const meta = {};
@@ -62,7 +87,7 @@ function parse(raw) {
 }
 
 function serialize(meta, body) {
-  const lines = ["title", "type", "agent", "date", "updated", "pinned", ...LIST_FIELDS]
+  const lines = ["title", "type", "agent", "date", "updated", "pinned", "guard", ...LIST_FIELDS]
     .filter((key) => (Array.isArray(meta[key]) ? meta[key].length : meta[key]))
     .map((key) => `${key}: ${Array.isArray(meta[key]) ? meta[key].join(", ") : String(meta[key]).replace(/\n/g, " ")}`);
   return `---\n${lines.join("\n")}\n---\n\n${body.trim()}\n`;
@@ -72,6 +97,7 @@ export class Store {
   constructor(cwd, home = process.env.AGENTMEM_HOME || path.join(os.homedir(), ".agentmem")) {
     this.project = projectKey(cwd);
     this.dir = path.join(home, this.project.id);
+    this.teamDir = path.join(this.project.root, TEAM_DIR);
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(
       path.join(this.dir, "project.json"),
@@ -79,10 +105,17 @@ export class Store {
     );
   }
 
-  file(id) {
-    const file = path.join(this.dir, `${path.basename(id)}.md`);
-    if (!fs.existsSync(file)) throw new Error(`memory not found: ${id}`);
-    return file;
+  dirFor(scope) {
+    if (!SCOPES.includes(scope)) throw new Error(`scope must be one of: ${SCOPES.join(", ")}`);
+    return scope === "team" ? this.teamDir : this.dir;
+  }
+
+  locate(id) {
+    for (const scope of SCOPES) {
+      const file = path.join(this.dirFor(scope), `${path.basename(id)}.md`);
+      if (fs.existsSync(file)) return { file, scope };
+    }
+    throw new Error(`memory not found: ${id}`);
   }
 
   checkSecrets(...texts) {
@@ -93,63 +126,97 @@ export class Store {
   similar(title, exceptId) {
     const a = words(title);
     if (!a.size) return null;
-    return (
-      this.list().find((m) => {
-        if (m.id === exceptId) return false;
-        const b = words(m.title || "");
-        const shared = [...a].filter((w) => b.has(w)).length;
-        return shared / new Set([...a, ...b]).size >= 0.6;
-      }) || null
+    return this.list().find((m) => m.id !== exceptId && overlap(a, words(m.title || "")) >= 0.6) || null;
+  }
+
+  related({ title = "", content = "", files = [] }, exceptId) {
+    const a = words(`${title} ${content}`);
+    const fileSet = new Set(toList(files));
+    return this.list().filter(
+      (m) => m.id !== exceptId && (m.files.some((f) => fileSet.has(f)) || overlap(a, words(`${m.title} ${m.body}`)) >= 0.25)
     );
   }
 
-  write({ title, content, type = "note", agent = "unknown", files, tags, pinned = false, force = false }) {
+  hashes(files) {
+    return files
+      .filter((f) => !isGlob(f) && fs.existsSync(path.resolve(this.project.root, f)))
+      .map((f) => `${f}@${fileHash(path.resolve(this.project.root, f))}`);
+  }
+
+  validate({ type, guard }) {
+    if (type !== undefined && !TYPES.includes(type)) throw new Error(`type must be one of: ${TYPES.join(", ")}`);
+    if (guard && !GUARDS.includes(guard)) throw new Error(`guard must be one of: ${GUARDS.join(", ")}`);
+  }
+
+  write({ title, content, type = "note", agent = "unknown", files, tags, pinned = false, guard, scope = "local", force = false }) {
     if (!title || !content) throw new Error("title and content are required");
-    if (!TYPES.includes(type)) throw new Error(`type must be one of: ${TYPES.join(", ")}`);
+    this.validate({ type, guard });
+    const dir = this.dirFor(scope);
     this.checkSecrets(title, content);
     const dup = force ? null : this.similar(title);
     if (dup) throw new Error(`similar memory exists: ${dup.id} "${dup.title}". Use memory_update, or pass force: true`);
+    fs.mkdirSync(dir, { recursive: true });
     const date = new Date().toLocaleDateString("sv");
     let id = `${date}-${slugify(title)}`;
-    for (let n = 2; fs.existsSync(path.join(this.dir, `${id}.md`)); n++) id = `${date}-${slugify(title)}-${n}`;
-    const meta = { title, type, agent, date, pinned, files: toList(files), tags: toList(tags) };
-    fs.writeFileSync(path.join(this.dir, `${id}.md`), serialize(meta, content));
+    for (let n = 2; SCOPES.some((s) => fs.existsSync(path.join(this.dirFor(s), `${id}.md`))); n++) id = `${date}-${slugify(title)}-${n}`;
+    const fileList = toList(files);
+    const meta = { title, type, agent, date, pinned, guard, files: fileList, tags: toList(tags), hashes: this.hashes(fileList) };
+    fs.writeFileSync(path.join(dir, `${id}.md`), serialize(meta, content));
     return id;
   }
 
   update(id, fields) {
-    const file = this.file(id);
+    const { file } = this.locate(id);
     const { meta, body } = parse(fs.readFileSync(file, "utf8"));
-    if (fields.type && !TYPES.includes(fields.type)) throw new Error(`type must be one of: ${TYPES.join(", ")}`);
+    this.validate(fields);
     this.checkSecrets(fields.title, fields.content);
-    for (const key of ["title", "type", "pinned"]) if (fields[key] !== undefined) meta[key] = fields[key];
-    for (const key of LIST_FIELDS) if (fields[key] !== undefined) meta[key] = toList(fields[key]);
+    for (const key of ["title", "type", "pinned", "guard"]) if (fields[key] !== undefined) meta[key] = fields[key];
+    for (const key of ["files", "tags"]) if (fields[key] !== undefined) meta[key] = toList(fields[key]);
+    meta.hashes = this.hashes(meta.files);
     meta.updated = new Date().toLocaleDateString("sv");
     fs.writeFileSync(file, serialize(meta, fields.content ?? body));
     return id;
   }
 
+  promote(id) {
+    const { file, scope } = this.locate(id);
+    if (scope === "team") throw new Error(`${id} is already a team memory`);
+    const { meta, body } = parse(fs.readFileSync(file, "utf8"));
+    this.checkSecrets(meta.title, body);
+    fs.mkdirSync(this.teamDir, { recursive: true });
+    fs.renameSync(file, path.join(this.teamDir, path.basename(file)));
+    return id;
+  }
+
   list() {
-    return fs
-      .readdirSync(this.dir)
-      .filter((f) => f.endsWith(".md"))
-      .sort()
-      .map((f) => {
-        const { meta, body } = parse(fs.readFileSync(path.join(this.dir, f), "utf8"));
-        const stale = meta.files.filter((p) => !fs.existsSync(path.resolve(this.project.root, p)));
-        return { id: f.slice(0, -3), ...meta, body, stale };
-      });
+    return SCOPES.flatMap((scope) => {
+      const dir = this.dirFor(scope);
+      if (!fs.existsSync(dir)) return [];
+      return fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith(".md") && f !== "README.md")
+        .map((f) => {
+          const { meta, body } = parse(fs.readFileSync(path.join(dir, f), "utf8"));
+          const exact = meta.files.filter((p) => !isGlob(p));
+          const stale = exact.filter((p) => !fs.existsSync(path.resolve(this.project.root, p)));
+          const recorded = Object.fromEntries(meta.hashes.map((h) => [h.slice(0, h.lastIndexOf("@")), h.slice(h.lastIndexOf("@") + 1)]));
+          const changed = exact.filter(
+            (p) => recorded[p] && !stale.includes(p) && recorded[p] !== fileHash(path.resolve(this.project.root, p))
+          );
+          return { id: f.slice(0, -3), scope, ...meta, body, stale, changed };
+        });
+    }).sort((a, b) => a.id.localeCompare(b.id));
   }
 
   read(id) {
-    return fs.readFileSync(this.file(id), "utf8");
+    return fs.readFileSync(this.locate(id).file, "utf8");
   }
 
   search(query) {
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
     return this.list()
       .map((m) => {
-        const text = `${m.title} ${m.type} ${m.tags.join(" ")} ${m.files.join(" ")} ${m.body}`.toLowerCase();
+        const text = `${m.title} ${m.type} ${m.scope} ${m.tags.join(" ")} ${m.files.join(" ")} ${m.body}`.toLowerCase();
         return { m, score: terms.filter((t) => text.includes(t)).length };
       })
       .filter((r) => r.score > 0)
@@ -157,17 +224,33 @@ export class Store {
       .map((r) => r.m);
   }
 
+  relative(filePath) {
+    const abs = path.resolve(this.project.root, filePath);
+    const real = (p) => (fs.existsSync(p) ? fs.realpathSync(p) : path.join(real(path.dirname(p)), path.basename(p)));
+    return path.relative(real(this.project.root), real(abs)).split(path.sep).join("/");
+  }
+
   forFile(filePath) {
-    const rel = path.relative(this.project.root, path.resolve(this.project.root, filePath));
-    return this.list().filter((m) => m.files.some((f) => path.normalize(f) === rel));
+    const rel = this.relative(filePath);
+    return this.list().filter((m) => m.files.some((f) => (isGlob(f) ? globToRegex(f).test(rel) : path.normalize(f) === path.normalize(rel))));
+  }
+
+  guardsFor(filePath) {
+    return this.forFile(filePath).filter((m) => m.guard);
   }
 
   delete(id) {
-    fs.unlinkSync(this.file(id));
+    fs.unlinkSync(this.locate(id).file);
   }
 }
 
 export function summary(m) {
-  const flags = [m.pinned && "pinned", m.stale?.length && `stale: ${m.stale.join(", ")} missing`].filter(Boolean);
+  const flags = [
+    m.scope === "team" && "team",
+    m.pinned && "pinned",
+    m.guard && `guard: ${m.guard}`,
+    m.stale?.length && `stale: ${m.stale.join(", ")} missing`,
+    m.changed?.length && `changed since written: ${m.changed.join(", ")}`,
+  ].filter(Boolean);
   return `- ${m.id} [${m.type}] ${m.title}${flags.length ? ` (${flags.join("; ")})` : ""}`;
 }

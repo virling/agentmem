@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { capture, extractTranscript, parseItems } from "../src/capture.js";
+import { capture, extractTranscript, findConflicts, parseItems } from "../src/capture.js";
 import { Store } from "../src/store.js";
 import { tmp } from "./helpers.js";
 
@@ -35,4 +35,15 @@ test("capture extracts transcript and saves model items", () => {
 test("parseItems handles junk", () => {
   assert.deepEqual(parseItems("nothing here"), []);
   assert.deepEqual(parseItems("[]"), []);
+});
+
+test("findConflicts keeps only pairs of known ids", () => {
+  const store = new Store(tmp(), tmp());
+  const a = store.write({ title: "Use npm", content: "npm only" });
+  const b = store.write({ title: "Package manager is pnpm", content: "pnpm only" });
+  const fake = (prompt) => {
+    assert.match(prompt, /pnpm only[\s\S]*npm only/);
+    return JSON.stringify([{ ids: [a, b], reason: "different package managers" }, { ids: [a, "ghost"], reason: "x" }]);
+  };
+  assert.deepEqual(findConflicts(store, fake), [{ ids: [a, b], reason: "different package managers" }]);
 });

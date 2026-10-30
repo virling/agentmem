@@ -19,7 +19,8 @@ export function sessionStartContext(store) {
   const lines = [`agentmem: ${all.length} memories for ${store.project.name}. Use memory_read for details, memory_write for new facts.`];
   if (pinned.length) lines.push("", "Pinned:", ...pinned.map((m) => `${summary(m)}\n  ${m.body}`));
   if (rest.length) lines.push("", "Index:", ...rest.map(summary));
-  if (all.some((m) => m.stale.length)) lines.push("", "Stale memories reference missing files: verify, then memory_update or memory_delete.");
+  if (all.some((m) => m.stale.length || m.changed.length))
+    lines.push("", "Some memories reference files that are missing or changed since they were written: check them, then memory_update (re-verifies) or memory_delete.");
   return lines.join("\n");
 }
 
@@ -33,6 +34,17 @@ export function fileContext(store, filePath, sessionId) {
   return `agentmem memories linked to ${filePath}:\n${hits.map((m) => `${summary(m)}\n  ${m.body}`).join("\n")}`;
 }
 
+export function guardDecision(store, filePath) {
+  const guards = store.guardsFor(filePath);
+  if (!guards.length) return null;
+  const blocking = guards.some((m) => m.guard === "block");
+  const reasons = guards.map((m) => `${m.title}: ${m.body.replace(/\n+/g, " ")} (${m.id})`).join("\n");
+  return {
+    permissionDecision: blocking ? "deny" : "ask",
+    permissionDecisionReason: `agentmem guardrail on ${store.relative(filePath)}:\n${reasons}`,
+  };
+}
+
 export async function runHook(event) {
   if (process.env.AGENTMEM_CAPTURE) return;
   let raw = "";
@@ -41,6 +53,12 @@ export async function runHook(event) {
   const store = new Store(input.cwd || process.cwd());
 
   if (event === "session-start") return output("SessionStart", sessionStartContext(store));
+  if (event === "pre-tool-use") {
+    const filePath = input.tool_input?.file_path || input.tool_input?.notebook_path;
+    const decision = filePath && guardDecision(store, filePath);
+    if (decision) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", ...decision } }));
+    return;
+  }
   if (event === "post-tool-use") {
     const filePath = input.tool_input?.file_path;
     return filePath && output("PostToolUse", fileContext(store, filePath, input.session_id));
