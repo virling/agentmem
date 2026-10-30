@@ -50,3 +50,13 @@ test("setTomlServer replaces only the agentmem block", () => {
   assert.match(after, /args = \["\/a\/bin\/agentmem.js","mcp"\]/);
   assert.equal(setTomlServer("", server), setTomlServer(setTomlServer("", server), server));
 });
+
+test("VS Code and OpenCode configs use their own formats", async () => {
+  const { setVscodeServer, setOpencodeServer } = await import("../src/install.js");
+  const server = { command: "node", args: ["/a/bin/agentmem.js", "mcp"] };
+  assert.deepEqual(setVscodeServer({ servers: { x: {} } }, server).servers.agentmem, { type: "stdio", ...server });
+  assert.deepEqual(setOpencodeServer({ $schema: "s" }, server), {
+    $schema: "s",
+    mcp: { agentmem: { type: "local", command: ["node", "/a/bin/agentmem.js", "mcp"], enabled: true } },
+  });
+});

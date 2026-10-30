@@ -13,13 +13,47 @@ const HOOKS = [
 
 const home = os.homedir();
 const claudeDir = () => process.env.CLAUDE_CONFIG_DIR || path.join(home, ".claude");
+const xdgConfig = () => process.env.XDG_CONFIG_HOME || path.join(home, ".config");
+const vscodeDir = () =>
+  process.platform === "darwin"
+    ? path.join(home, "Library", "Application Support", "Code", "User")
+    : process.platform === "win32"
+      ? path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "Code", "User")
+      : path.join(xdgConfig(), "Code", "User");
+const json = (fn) => (text, server) => JSON.stringify(fn(text.trim() ? JSON.parse(text) : {}, server), null, 2) + "\n";
+
+export function setJsonServer(data, server) {
+  data.mcpServers ??= {};
+  data.mcpServers.agentmem = server;
+  return data;
+}
+
+export function setVscodeServer(data, server) {
+  data.servers ??= {};
+  data.servers.agentmem = { type: "stdio", ...server };
+  return data;
+}
+
+export function setOpencodeServer(data, server) {
+  data.mcp ??= {};
+  data.mcp.agentmem = { type: "local", command: [server.command, ...server.args], enabled: true };
+  return data;
+}
+
+export function setTomlServer(text, server) {
+  const cleaned = text.replace(/\n*\[mcp_servers\.agentmem\]\n(?:(?!\[)[^\n]*(?:\n|$))*/, "\n").trimEnd();
+  const block = `[mcp_servers.agentmem]\ncommand = ${JSON.stringify(server.command)}\nargs = ${JSON.stringify(server.args)}\n`;
+  return cleaned ? `${cleaned}\n\n${block}` : block;
+}
 
 export const AGENTS = {
   claude: { dir: claudeDir },
-  cursor: { dir: () => path.join(home, ".cursor"), file: "mcp.json" },
-  windsurf: { dir: () => path.join(home, ".codeium", "windsurf"), file: "mcp_config.json" },
-  gemini: { dir: () => path.join(home, ".gemini"), file: "settings.json" },
-  codex: { dir: () => path.join(home, ".codex"), file: "config.toml" },
+  cursor: { dir: () => path.join(home, ".cursor"), file: "mcp.json", set: json(setJsonServer) },
+  windsurf: { dir: () => path.join(home, ".codeium", "windsurf"), file: "mcp_config.json", set: json(setJsonServer) },
+  gemini: { dir: () => path.join(home, ".gemini"), file: "settings.json", set: json(setJsonServer) },
+  codex: { dir: () => path.join(home, ".codex"), file: "config.toml", set: setTomlServer },
+  vscode: { dir: vscodeDir, file: "mcp.json", set: json(setVscodeServer) },
+  opencode: { dir: () => path.join(xdgConfig(), "opencode"), file: "opencode.json", set: json(setOpencodeServer) },
 };
 
 export function serverCommand(entry, pkg) {
@@ -43,18 +77,6 @@ export function addHooks(settings, prefix) {
   return added;
 }
 
-export function setJsonServer(data, server) {
-  data.mcpServers ??= {};
-  data.mcpServers.agentmem = server;
-  return data;
-}
-
-export function setTomlServer(text, server) {
-  const cleaned = text.replace(/\n*\[mcp_servers\.agentmem\]\n(?:(?!\[)[^\n]*(?:\n|$))*/, "\n").trimEnd();
-  const block = `[mcp_servers.agentmem]\ncommand = ${JSON.stringify(server.command)}\nargs = ${JSON.stringify(server.args)}\n`;
-  return cleaned ? `${cleaned}\n\n${block}` : block;
-}
-
 function installClaude(server) {
   const file = path.join(claudeDir(), "settings.json");
   const settings = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
@@ -70,11 +92,7 @@ function installClaude(server) {
 
 function installFile(agent, server) {
   const file = path.join(agent.dir(), agent.file);
-  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-  const out = file.endsWith(".toml")
-    ? setTomlServer(text, server)
-    : JSON.stringify(setJsonServer(text.trim() ? JSON.parse(text) : {}, server), null, 2) + "\n";
-  fs.writeFileSync(file, out);
+  fs.writeFileSync(file, agent.set(fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "", server));
   return `MCP server in ${file}`;
 }
 

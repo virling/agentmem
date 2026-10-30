@@ -8,7 +8,7 @@ import { Store, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
 
-  agentmem install [agent...]       configure detected agents (claude, cursor, windsurf, gemini, codex)
+  agentmem install [agent...]       configure detected agents (claude, cursor, windsurf, gemini, codex, vscode, opencode)
   agentmem mcp                      start the MCP server (default when stdin is piped)
   agentmem list                     list memories for this project (local and team)
   agentmem search <query>
