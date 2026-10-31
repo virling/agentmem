@@ -17,6 +17,7 @@ export function sessionStartContext(store) {
   const handoff = store.latestHandoff();
   const pinned = all.filter((m) => m.pinned && m.id !== handoff?.id);
   const rest = all.filter((m) => !m.pinned && m.type !== "handoff").slice(-INDEX_LIMIT);
+  store.touch([handoff?.id, ...pinned.map((m) => m.id)]);
   const lines = [`agentmem: ${all.length} memories for ${store.project.name}. Use memory_read for details, memory_write for new facts.`];
   if (handoff) lines.push("", handoffText(handoff));
   if (pinned.length) lines.push("", "Pinned:", ...pinned.map((m) => `${summary(m)}\n  ${m.body}`));
@@ -38,12 +39,14 @@ export function fileContext(store, filePath, sessionId) {
   if (!hits.length) return "";
   hits.forEach((m) => seen.add(m.id));
   fs.writeFileSync(seenFile, JSON.stringify([...seen]));
+  store.touch(hits.map((m) => m.id));
   return `agentmem memories linked to ${filePath}:\n${hits.map((m) => `${summary(m)}\n  ${m.body}`).join("\n")}`;
 }
 
 export function guardDecision(store, filePath) {
   const guards = store.guardsFor(filePath);
   if (!guards.length) return null;
+  store.touch(guards.map((m) => m.id));
   const blocking = guards.some((m) => m.guard === "block");
   const reasons = guards.map((m) => `${m.title}: ${m.body.replace(/\n+/g, " ")} (${m.id})`).join("\n");
   return {

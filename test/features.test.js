@@ -3,8 +3,24 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { buildPrompt, capture, fixedFailures } from "../src/capture.js";
+import { sessionStartContext } from "../src/hooks.js";
 import { Store } from "../src/store.js";
 import { tmp } from "./helpers.js";
+
+test("usage is counted and unused memories are flagged", () => {
+  const store = new Store(tmp(), tmp());
+  const a = store.write({ title: "Pinned rule", content: "x", pinned: true });
+  const b = store.write({ title: "Rarely needed", content: "y" });
+  sessionStartContext(store);
+  sessionStartContext(store);
+  const stats = store.stats();
+  assert.equal(stats.find((m) => m.id === a).uses, 2);
+  assert.equal(stats.find((m) => m.id === b).uses, 0);
+  assert.equal(stats.find((m) => m.id === b).unused, false);
+  const later = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
+  assert.equal(store.stats(later).find((m) => m.id === b).unused, true);
+  assert.equal(store.stats(later).find((m) => m.id === a).unused, false);
+});
 
 test("failed commands fixed by edits become gotcha hints", () => {
   const store = new Store(tmp(), tmp());

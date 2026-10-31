@@ -26,6 +26,7 @@ const HELP = `agentmem: project memory for AI agents
   agentmem export [agents|claude|copilot|cursor ...] [--include-local]
                                     write team memories into agent rule files
   agentmem check                    find contradicting memories (uses claude -p)
+  agentmem stats                    how often each memory was used, and which were never used
   agentmem path                     print the storage folders for this project
   agentmem hook <session-start|pre-tool-use|post-tool-use|session-end>
   agentmem capture <transcript.jsonl>
@@ -62,6 +63,7 @@ async function main() {
       return console.log(hits.length ? hits.map(summary).join("\n") : "No matches.");
     }
     case "show":
+      store.touch([positional[0]]);
       return console.log(store.read(positional[0]));
     case "add": {
       const { pin, team, ...rest } = flags;
@@ -98,6 +100,13 @@ async function main() {
     }
     case "path":
       return console.log(`local: ${store.dir}\nteam:  ${store.teamDir}`);
+    case "stats": {
+      const all = store.stats();
+      if (!all.length) return console.log("No memories yet.");
+      console.log(all.map((m) => `${summary(m)}\n    ${m.uses} uses${m.last ? `, last ${m.last}` : ""}`).join("\n"));
+      const unused = all.filter((m) => m.unused && m.scope !== "org");
+      return unused.length && console.log(`\nNot used in 14+ days, consider \`agentmem rm <id>\`:\n${unused.map(summary).join("\n")}`);
+    }
     case "capture": {
       const result = capture(store, positional[0]);
       logCapture(store, positional[0], result);

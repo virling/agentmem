@@ -10,6 +10,7 @@ export const GUARDS = ["warn", "block"];
 export const SCOPES = ["local", "team"];
 const LIST_FIELDS = ["files", "tags", "hashes"];
 const TEAM_DIR = ".agentmem";
+const UNUSED_AFTER_DAYS = 14;
 
 const SECRET_PATTERNS = [
   /sk-[A-Za-z0-9_-]{20,}/,
@@ -252,6 +253,32 @@ export class Store {
 
   delete(id) {
     fs.unlinkSync(this.locate(id).file);
+  }
+
+  usage() {
+    const file = path.join(this.dir, "usage.json");
+    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { since: new Date().toLocaleDateString("sv"), items: {} };
+  }
+
+  touch(ids) {
+    ids = ids.filter(Boolean);
+    if (!ids.length) return;
+    const usage = this.usage();
+    const now = new Date().toLocaleString("sv").slice(0, 16);
+    for (const id of ids) usage.items[id] = { count: (usage.items[id]?.count || 0) + 1, last: now };
+    fs.writeFileSync(path.join(this.dir, "usage.json"), JSON.stringify(usage, null, 2));
+  }
+
+  stats(now = new Date()) {
+    const usage = this.usage();
+    const cutoff = new Date(now - UNUSED_AFTER_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString("sv");
+    return this.list()
+      .map((m) => {
+        const used = usage.items[m.id];
+        const since = [m.date, usage.since].filter(Boolean).sort().pop();
+        return { ...m, uses: used?.count || 0, last: used?.last, unused: !used && since <= cutoff };
+      })
+      .sort((a, b) => b.uses - a.uses);
   }
 }
 

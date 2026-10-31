@@ -121,6 +121,7 @@ function call(name, args = {}) {
       return hits.length ? hits.map((m) => `${summary(m)}\n  ${m.body.slice(0, 200)}`).join("\n") : "No matches.";
     }
     case "memory_read":
+      store.touch([args.id]);
       return store.read(args.id);
     case "memory_write": {
       const id = store.write(args);
