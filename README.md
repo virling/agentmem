@@ -279,7 +279,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: virling/agentmem/guard@v0.6.0
+      - uses: virling/agentmem/guard@v0
 ```
 
 `block` guardrails fail the check and `warn` guardrails add a warning on the file. Only team memories are in the repo, so only team guardrails apply.
