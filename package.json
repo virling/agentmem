@@ -1,6 +1,6 @@
 {
   "name": "@virling/agentmem",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Project-scoped local memory for AI coding agents over MCP",
   "type": "module",
   "bin": {

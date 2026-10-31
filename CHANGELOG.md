@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-01
+
+### Added
+
+- Org memory: `agentmem org add <git-url>` shares an org repo's `.agentmem/` memories, read-only, with every project of the same owner.
+- `agentmem stats` shows how often each memory was used and flags ones unused for 14+ days.
+- `agentmem guard-check` and a guardrails GitHub Action (`virling/agentmem/guard@v0`) fail pull requests that change `block`-guarded files.
+- Auto-capture turns commands that failed and then passed after an edit into gotcha candidates.
+- The MCP server warns Claude Code when agentmem's hooks are missing from settings, so sessions are not silently left uncaptured.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added
@@ -71,7 +81,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/virling/agentmem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/virling/agentmem/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/virling/agentmem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/virling/agentmem/compare/v0.2.0...v0.3.0
