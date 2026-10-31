@@ -6,8 +6,9 @@ import { exportRules } from "../src/export.js";
 import { guardCheck, runHook } from "../src/hooks.js";
 import { install } from "../src/install.js";
 import { startServer, writeHandoff } from "../src/mcp.js";
+import { addOrg, pullOrgs, removeOrg } from "../src/org.js";
 import { capturePullRequest, prFromEvent } from "../src/pr-capture.js";
-import { Store, summary } from "../src/store.js";
+import { Store, defaultHome, orgRepos, ownerPrefix, summary } from "../src/store.js";
 
 const HELP = `agentmem: project memory for AI agents
 
@@ -29,6 +30,8 @@ const HELP = `agentmem: project memory for AI agents
   agentmem check                    find contradicting memories (uses claude -p)
   agentmem stats                    how often each memory was used, and which were never used
   agentmem guard-check [--base ref] fail if files changed since ref (default HEAD^1) are guarded
+  agentmem org add <git-url>        share an org memory repo with every project of the same owner
+  agentmem org pull | list | rm <git-url>
   agentmem path                     print the storage folders for this project
   agentmem hook <session-start|pre-tool-use|post-tool-use|session-end>
   agentmem capture <transcript.jsonl>
@@ -52,6 +55,7 @@ async function main() {
   if (command === "mcp" || (!command && !process.stdin.isTTY)) return startServer();
   if (command === "hook") return runHook(rest[0]);
   if (command === "install") return install(rest);
+  if (command === "org") return org(rest);
 
   const { positional, flags } = parseArgs(rest);
   const store = new Store(process.cwd());
@@ -101,7 +105,7 @@ async function main() {
       return console.log(conflicts.map((c) => `- ${c.ids.join(" vs ")}: ${c.reason}`).join("\n"));
     }
     case "path":
-      return console.log(`local: ${store.dir}\nteam:  ${store.teamDir}`);
+      return console.log([`local: ${store.dir}`, `team:  ${store.teamDir}`, ...store.orgDirs.map((d) => `org:   ${d}`)].join("\n"));
     case "stats": {
       const all = store.stats();
       if (!all.length) return console.log("No memories yet.");
@@ -143,6 +147,18 @@ async function main() {
     default:
       console.log(HELP);
   }
+}
+
+function org([sub, url]) {
+  const home = defaultHome();
+  if (sub === "add") {
+    const { source, prefix } = addOrg(home, url);
+    return console.log(`Added ${source}. Its .agentmem/ memories now apply to every project under ${prefix}`);
+  }
+  if (sub === "pull") return console.log(`Updated ${pullOrgs(home).length} org memory repos.`);
+  if (sub === "rm") return console.log(`Removed ${removeOrg(home, url)}`);
+  const repos = orgRepos(home);
+  console.log(repos.length ? repos.map((r) => `- ${r.source} (applies to ${ownerPrefix(r.source)}*)`).join("\n") : "No org memory repos.");
 }
 
 main().catch((err) => {

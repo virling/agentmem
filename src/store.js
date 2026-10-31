@@ -10,6 +10,7 @@ export const GUARDS = ["warn", "block"];
 export const SCOPES = ["local", "team"];
 const LIST_FIELDS = ["files", "tags", "hashes"];
 const TEAM_DIR = ".agentmem";
+export const ORG_FILE = "org.json";
 const UNUSED_AFTER_DAYS = 14;
 
 const SECRET_PATTERNS = [
@@ -31,10 +32,21 @@ function git(cwd, args) {
   }
 }
 
+export const defaultHome = () => process.env.AGENTMEM_HOME || path.join(os.homedir(), ".agentmem");
+
+export const normalizeRemote = (url) => url.replace(/\.git$/, "").replace(/^git@([^:]+):/, "https://$1/");
+
+export const ownerPrefix = (source) => source.slice(0, source.lastIndexOf("/") + 1);
+
+export function orgRepos(home) {
+  const file = path.join(home, ORG_FILE);
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+}
+
 export function projectKey(cwd) {
   const remote = git(cwd, ["remote", "get-url", "origin"]);
   const root = git(cwd, ["rev-parse", "--show-toplevel"]) || path.resolve(cwd);
-  const source = remote ? remote.replace(/\.git$/, "").replace(/^git@([^:]+):/, "https://$1/") : root;
+  const source = remote ? normalizeRemote(remote) : root;
   const name = path.basename(root);
   const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
   return { id: `${name}-${hash}`, name, source, root };
@@ -96,10 +108,13 @@ function serialize(meta, body) {
 }
 
 export class Store {
-  constructor(cwd, home = process.env.AGENTMEM_HOME || path.join(os.homedir(), ".agentmem")) {
+  constructor(cwd, home = defaultHome()) {
     this.project = projectKey(cwd);
     this.dir = path.join(home, this.project.id);
     this.teamDir = path.join(this.project.root, TEAM_DIR);
+    this.orgDirs = orgRepos(home)
+      .filter((r) => this.project.source.startsWith(ownerPrefix(r.source)))
+      .map((r) => path.join(r.dir, TEAM_DIR));
     fs.mkdirSync(this.dir, { recursive: true });
     fs.writeFileSync(
       path.join(this.dir, "project.json"),
@@ -112,10 +127,16 @@ export class Store {
     return scope === "team" ? this.teamDir : this.dir;
   }
 
-  locate(id) {
-    for (const scope of SCOPES) {
-      const file = path.join(this.dirFor(scope), `${path.basename(id)}.md`);
-      if (fs.existsSync(file)) return { file, scope };
+  sources() {
+    return [...SCOPES.map((scope) => [scope, this.dirFor(scope)]), ...this.orgDirs.map((dir) => ["org", dir])];
+  }
+
+  locate(id, { writable = false } = {}) {
+    for (const [scope, dir] of this.sources()) {
+      const file = path.join(dir, `${path.basename(id)}.md`);
+      if (!fs.existsSync(file)) continue;
+      if (writable && scope === "org") throw new Error(`${id} is an org memory, change it in the org memory repo`);
+      return { file, scope };
     }
     throw new Error(`memory not found: ${id}`);
   }
@@ -169,7 +190,7 @@ export class Store {
   }
 
   update(id, fields) {
-    const { file } = this.locate(id);
+    const { file } = this.locate(id, { writable: true });
     const { meta, body } = parse(fs.readFileSync(file, "utf8"));
     this.validate(fields);
     this.checkSecrets(fields.title, fields.content);
@@ -182,7 +203,7 @@ export class Store {
   }
 
   promote(id) {
-    const { file, scope } = this.locate(id);
+    const { file, scope } = this.locate(id, { writable: true });
     if (scope === "team") throw new Error(`${id} is already a team memory`);
     const { meta, body } = parse(fs.readFileSync(file, "utf8"));
     this.checkSecrets(meta.title, body);
@@ -192,8 +213,7 @@ export class Store {
   }
 
   list() {
-    return SCOPES.flatMap((scope) => {
-      const dir = this.dirFor(scope);
+    return this.sources().flatMap(([scope, dir]) => {
       if (!fs.existsSync(dir)) return [];
       return fs
         .readdirSync(dir)
@@ -252,7 +272,7 @@ export class Store {
   }
 
   delete(id) {
-    fs.unlinkSync(this.locate(id).file);
+    fs.unlinkSync(this.locate(id, { writable: true }).file);
   }
 
   usage() {
@@ -284,7 +304,7 @@ export class Store {
 
 export function summary(m) {
   const flags = [
-    m.scope === "team" && "team",
+    m.scope !== "local" && m.scope,
     m.pinned && "pinned",
     m.guard && `guard: ${m.guard}`,
     m.stale?.length && `stale: ${m.stale.join(", ")} missing`,

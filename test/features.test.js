@@ -1,11 +1,51 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { buildPrompt, capture, fixedFailures } from "../src/capture.js";
 import { guardCheck, sessionStartContext } from "../src/hooks.js";
-import { Store } from "../src/store.js";
+import { addOrg, pullOrgs, removeOrg } from "../src/org.js";
+import { Store, summary } from "../src/store.js";
 import { tmp } from "./helpers.js";
+
+const git = (cwd, ...args) => execFileSync("git", args, { cwd, stdio: "ignore" });
+
+function repo(remote) {
+  const dir = tmp();
+  git(dir, "init", "-q");
+  git(dir, "remote", "add", "origin", remote);
+  return dir;
+}
+
+test("org memories apply to projects of the same owner and are read-only", () => {
+  const home = tmp();
+  const orgRepo = tmp();
+  git(orgRepo, "init", "-q");
+  new Store(orgRepo, tmp()).write({ title: "Use UTC in the database", content: "Store timestamps as UTC.", scope: "team" });
+  git(orgRepo, "add", ".");
+  git(orgRepo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init");
+
+  addOrg(home, orgRepo);
+  const ours = new Store(repo("git@github.com:acme/app.git"), home);
+  const theirs = new Store(repo("https://github.com/other/app"), home);
+  assert.equal(theirs.list().length, 0);
+  assert.equal(ours.list().length, 0, "local path org repo has no owner match");
+
+  const [cloned] = JSON.parse(fs.readFileSync(path.join(home, "org.json"), "utf8"));
+  fs.writeFileSync(path.join(home, "org.json"), JSON.stringify([{ ...cloned, source: "https://github.com/acme/.agentmem" }]));
+  const store = new Store(repo("git@github.com:acme/app.git"), home);
+  const [m] = store.list();
+  assert.equal(m.scope, "org");
+  assert.match(summary(m), /\(org\)/);
+  assert.throws(() => store.delete(m.id), /org memory/);
+  assert.throws(() => store.update(m.id, { title: "x" }), /org memory/);
+  assert.match(store.read(m.id), /UTC/);
+
+  assert.equal(pullOrgs(home).length, 1);
+  removeOrg(home, "https://github.com/acme/.agentmem");
+  assert.equal(new Store(store.project.root, home).list().length, 0);
+});
 
 test("usage is counted and unused memories are flagged", () => {
   const store = new Store(tmp(), tmp());
