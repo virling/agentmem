@@ -77,6 +77,20 @@ export function addHooks(settings, prefix) {
   return added;
 }
 
+export function missingHooks(settings) {
+  if (Object.entries(settings.enabledPlugins || {}).some(([k, on]) => on && k.startsWith("agentmem@"))) return [];
+  const commands = Object.values(settings.hooks || {}).flat().flatMap((g) => g.hooks || []).map((h) => h.command || "");
+  return HOOKS.filter(({ arg }) => !commands.some((c) => c.endsWith(` hook ${arg}`))).map((h) => h.event);
+}
+
+export function claudeHookWarning() {
+  const file = path.join(claudeDir(), "settings.json");
+  const missing = missingHooks(fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {});
+  return missing.length
+    ? `agentmem hooks are missing from ${file} (${missing.join(", ")}), so sessions are not auto-captured. Tell the user to run: agentmem install claude`
+    : "";
+}
+
 function installClaude(server) {
   const file = path.join(claudeDir(), "settings.json");
   const settings = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};

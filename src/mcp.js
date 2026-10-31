@@ -1,5 +1,6 @@
 import readline from "node:readline";
 import { handoffText } from "./hooks.js";
+import { claudeHookWarning } from "./install.js";
 import { GUARDS, SCOPES, Store, TYPES, summary } from "./store.js";
 
 const stores = new Map();
@@ -146,12 +147,15 @@ function call(name, args = {}) {
 
 function handle(msg) {
   switch (msg.method) {
-    case "initialize":
+    case "initialize": {
+      const warning = msg.params?.clientInfo?.name === "claude-code" && claudeHookWarning();
       return {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
         serverInfo: { name: "agentmem", version: "0.5.0" },
+        ...(warning && { instructions: warning }),
       };
+    }
     case "ping":
       return {};
     case "tools/list":

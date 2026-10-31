@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addHooks, serverCommand, setJsonServer, setTomlServer } from "../src/install.js";
+import { addHooks, missingHooks, serverCommand, setJsonServer, setTomlServer } from "../src/install.js";
 
 test("addHooks is idempotent and keeps existing hooks", () => {
   const settings = { hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "x.sh" }] }] } };
@@ -59,4 +59,12 @@ test("VS Code and OpenCode configs use their own formats", async () => {
     $schema: "s",
     mcp: { agentmem: { type: "local", command: ["node", "/a/bin/agentmem.js", "mcp"], enabled: true } },
   });
+});
+
+test("missingHooks lists absent hooks unless the plugin is enabled", () => {
+  assert.deepEqual(missingHooks({}), ["SessionStart", "PreToolUse", "PostToolUse", "SessionEnd"]);
+  const settings = {};
+  addHooks(settings, "node /opt/agentmem/bin/agentmem.js");
+  assert.deepEqual(missingHooks(settings), []);
+  assert.deepEqual(missingHooks({ enabledPlugins: { "agentmem@virling": true } }), []);
 });
