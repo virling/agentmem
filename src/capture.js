@@ -24,7 +24,45 @@ export function extractTranscript(file, maxChars = 40000) {
   return parts.join("\n\n").slice(-maxChars);
 }
 
-export function buildPrompt(transcript, existingTitles) {
+function resultText(content) {
+  return typeof content === "string" ? content : (content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
+}
+
+export function fixedFailures(file) {
+  const uses = new Map();
+  const failing = new Map();
+  const fixes = [];
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const content = entry.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const c of content) {
+      if (c.type === "tool_use") {
+        uses.set(c.id, c);
+        const edited = c.input?.file_path || c.input?.notebook_path;
+        if (edited && c.name !== "Read") for (const f of failing.values()) f.files.add(edited);
+      }
+      const use = c.type === "tool_result" && uses.get(c.tool_use_id);
+      if (!use || use.name !== "Bash" || !use.input?.command) continue;
+      const key = use.input.command.trim().replace(/\s+/g, " ");
+      if (c.is_error) {
+        if (!failing.has(key)) failing.set(key, { command: key, error: resultText(c.content).slice(0, 500), files: new Set() });
+      } else if (failing.has(key)) {
+        const f = failing.get(key);
+        if (f.files.size) fixes.push({ ...f, files: [...f.files] });
+        failing.delete(key);
+      }
+    }
+  }
+  return fixes;
+}
+
+export function buildPrompt(transcript, existingTitles, fixes = []) {
   return `You extract durable project memory from a coding session transcript.
 
 Return ONLY a JSON array (no prose, no code fence). Each item: {"title": string, "content": string, "type": one of ${JSON.stringify(TYPES)}, "files": [repo-relative paths, optional]}.
@@ -34,7 +72,14 @@ Keep only facts that will still matter in a future session: decisions and why, p
 If the session ended with work unfinished, add one extra item with type "handoff": title "Handoff: <task>", content saying what is done, then "Next steps:" and the remaining steps in order. Skip it if the work was finished.
 
 Return [] if nothing qualifies.
-
+${
+  fixes.length
+    ? `
+These commands failed, then passed after the listed files were changed. Each is a strong candidate for a "gotcha": what broke, why, and the fix, with "files" set to the changed files. Skip any that were only a typo.
+${fixes.map((f) => `- \`${f.command}\` failed with:\n  ${f.error.replace(/\n+/g, "\n  ")}\n  fixed by changing: ${f.files.join(", ")}`).join("\n")}
+`
+    : ""
+}
 Existing memories:
 ${existingTitles.length ? existingTitles.map((t) => `- ${t}`).join("\n") : "(none)"}
 
@@ -53,8 +98,9 @@ export function parseItems(output, raw = false) {
 
 export function capture(store, transcriptPath, runModel = askClaude) {
   const transcript = extractTranscript(transcriptPath);
-  if (transcript.length < 500) return { saved: [], skipped: ["transcript too short"] };
-  const items = parseItems(runModel(buildPrompt(transcript, store.list().map((m) => m.title))));
+  const fixes = fixedFailures(transcriptPath).map((f) => ({ ...f, files: f.files.map((p) => store.relative(p)) }));
+  if (transcript.length < 500 && !fixes.length) return { saved: [], skipped: ["transcript too short"] };
+  const items = parseItems(runModel(buildPrompt(transcript, store.list().map((m) => m.title), fixes)));
   const saved = [];
   const skipped = [];
   for (const item of items) {
