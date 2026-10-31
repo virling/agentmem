@@ -1,17 +1,29 @@
 {
   "name": "agentmem",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Project memory shared by every AI coding agent: team memory in git, guardrails, handoffs, auto-capture",
-  "author": { "name": "Virling", "url": "https://github.com/virling" },
+  "author": {
+    "name": "Virling",
+    "url": "https://github.com/virling"
+  },
   "homepage": "https://github.com/virling/agentmem#readme",
   "repository": "https://github.com/virling/agentmem",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "keywords": ["memory", "mcp", "guardrails", "team-memory", "handoff"],
+  "keywords": [
+    "memory",
+    "mcp",
+    "guardrails",
+    "team-memory",
+    "handoff"
+  ],
   "mcpServers": {
     "agentmem": {
       "type": "stdio",
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/agentmem.js", "mcp"]
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/bin/agentmem.js",
+        "mcp"
+      ]
     }
   }
 }

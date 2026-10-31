@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-31
+
 ### Added
 
 - Claude Code plugin: `/plugin marketplace add virling/agentmem` then `/plugin install agentmem@virling`.
@@ -69,7 +71,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/virling/agentmem/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/virling/agentmem/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/virling/agentmem/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/virling/agentmem/releases/tag/v0.2.0
