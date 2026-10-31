@@ -27,8 +27,10 @@ Memory that lives with your code: reviewed in pull requests, enforced as guardra
 - [Claude Code hooks](#claude-code-hooks)
 - [Auto-capture](#auto-capture)
 - [Team memory](#team-memory)
+- [Org memory](#org-memory)
 - [Guardrails](#guardrails)
 - [Code-aware staleness](#code-aware-staleness)
+- [Usage stats](#usage-stats)
 - [Export to rule files](#export-to-rule-files)
 - [Contradiction checks](#contradiction-checks)
 - [Handoffs between agents](#handoffs-between-agents)
@@ -183,7 +185,10 @@ agentmem verify 2026-10-31-api-returns-json
 agentmem handoff "Refactored auth middleware" "1. Add tests 2. Update docs"
 agentmem export agents cursor
 agentmem check
-agentmem path        # prints this project's local and team folders
+agentmem stats       # how often each memory was used
+agentmem guard-check --base origin/main
+agentmem org add git@github.com:acme/.agentmem.git
+agentmem path        # prints this project's local, team and org folders
 ```
 
 Run `agentmem` with no arguments in a terminal to see the full help.
@@ -205,8 +210,9 @@ When a Claude Code session ends, agentmem:
 
 1. Reads the session transcript (user and assistant text only, last 40k characters).
 2. Sends it to `claude -p --model haiku` with no tools and no MCP servers.
-3. Saves up to 5 durable facts with `agent: auto-capture`. Secrets and near-duplicates are skipped. If work was left unfinished, it also writes a [handoff](#handoffs-between-agents).
-4. Appends the result to `capture.log` in the project's storage folder.
+3. Points out commands that failed and then passed after a file was edited, so the fix can be saved as a gotcha linked to those files.
+4. Saves up to 5 durable facts with `agent: auto-capture`. Secrets and near-duplicates are skipped. If work was left unfinished, it also writes a [handoff](#handoffs-between-agents).
+5. Appends the result to `capture.log` in the project's storage folder.
 
 Run it by hand on any transcript:
 
@@ -231,6 +237,19 @@ git add .agentmem && git commit -m "Add API error convention"
 
 Team memories are plain Markdown, so they show up in pull requests like any other change. Reviewers can correct or reject them before they reach the rest of the team, and everyone gets them on `git pull`. Agents call `memory_write` with `scope: "team"` or `memory_promote` to do the same.
 
+## Org memory
+
+Share rules across every repo of the same owner, such as "timestamps are UTC" for a whole GitHub org. Put team memories in the `.agentmem/` folder of one repo, then add it once:
+
+```bash
+agentmem org add git@github.com:acme/.agentmem.git
+agentmem org pull         # fetch the latest org memories
+agentmem org list
+agentmem org rm git@github.com:acme/.agentmem.git
+```
+
+The repo is cloned into `~/.agentmem/_org/`. Its memories show up, marked `(org)`, in every project whose `origin` remote has the same owner (here `github.com/acme/`). They are read-only: change them with a pull request to the org repo.
+
 ## Guardrails
 
 A memory with `guard` and a `files` pattern becomes a rule that the `PreToolUse` hook enforces in Claude Code:
@@ -245,6 +264,26 @@ agentmem add "Migrations are append-only" "Add a new migration file" --files "db
 
 Patterns support `*`, `**` and `?`. Agents without hooks get guardrails through [exported rule files](#export-to-rule-files).
 
+### In pull requests
+
+`agentmem guard-check` lists files changed since a ref (default `HEAD^1`) that are covered by a guardrail, and exits with an error if any are `block`. To run it on every pull request, add `.github/workflows/agentmem-guard.yml`:
+
+```yaml
+name: agentmem guardrails
+on: pull_request
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: virling/agentmem/guard@v0.6.0
+```
+
+`block` guardrails fail the check and `warn` guardrails add a warning on the file. Only team memories are in the repo, so only team guardrails apply.
+
 ## Code-aware staleness
 
 When a memory lists `files`, agentmem stores a content hash of each file. Later:
@@ -253,6 +292,16 @@ When a memory lists `files`, agentmem stores a content hash of each file. Later:
 - If a file's content changed, the memory is flagged `changed since written`.
 
 Both flags appear in `list`, search results and the session-start index, so the agent knows to double-check. After checking, run `agentmem verify <id>` (or `memory_update` with just the id) to record the current file versions.
+
+## Usage stats
+
+agentmem counts a memory as used when it is shown at session start (handoff and pinned), injected for a touched file, hit by a guardrail, or read with `memory_read` or `agentmem show`.
+
+```bash
+agentmem stats
+```
+
+It lists memories by use count, then the ones not used in 14 or more days so you can delete what no longer helps. Counts are stored in `usage.json` in the project's local folder.
 
 ## Export to rule files
 
@@ -378,6 +427,7 @@ agentmem/
 ├── hooks/             Claude Code plugin hooks
 ├── .claude-plugin/    Claude Code plugin and marketplace manifests
 ├── action.yml         PR memory GitHub Action
+├── guard/action.yml   Guardrails GitHub Action
 └── .github/           CI, release workflow, issue and PR templates
 ```
 
@@ -387,6 +437,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
 
 - **Agent does not see the tools.** Run `claude mcp list` and check that `agentmem` shows as connected. Restart the agent after config changes.
 - **Memories saved under the wrong project.** Run `agentmem path` inside the project to see the expected folder. Pass `project_path` from editors that start servers elsewhere.
+- **Nothing is captured and no handoff appears.** The hooks are missing. Run `agentmem install claude`, or check `~/.claude/settings.json` for the four `agentmem ... hook` entries. When they are missing, the MCP server tells Claude Code to say so.
 - **Auto-capture saved nothing.** Check `capture.log` in the folder from `agentmem path`. Short sessions (under 500 characters of conversation) are skipped.
 - **"similar memory exists".** Update the existing memory, or pass `force: true` / `--force`.
 - **"looks like it contains a secret".** Remove the key from the text. Store the name of the env var instead.
