@@ -1,0 +1,16 @@
+name: agentmem guardrails
+description: Fail pull requests that change files protected by agentmem block guardrails, and warn on warn guardrails
+author: Virling
+branding:
+  icon: shield
+  color: purple
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - name: Check guarded files
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/../bin/agentmem.js" guard-check --base HEAD^1

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { capture, findConflicts, logCapture } from "../src/capture.js";
 import { exportRules } from "../src/export.js";
-import { runHook } from "../src/hooks.js";
+import { guardCheck, runHook } from "../src/hooks.js";
 import { install } from "../src/install.js";
 import { startServer, writeHandoff } from "../src/mcp.js";
 import { capturePullRequest, prFromEvent } from "../src/pr-capture.js";
@@ -27,6 +28,7 @@ const HELP = `agentmem: project memory for AI agents
                                     write team memories into agent rule files
   agentmem check                    find contradicting memories (uses claude -p)
   agentmem stats                    how often each memory was used, and which were never used
+  agentmem guard-check [--base ref] fail if files changed since ref (default HEAD^1) are guarded
   agentmem path                     print the storage folders for this project
   agentmem hook <session-start|pre-tool-use|post-tool-use|session-end>
   agentmem capture <transcript.jsonl>
@@ -106,6 +108,19 @@ async function main() {
       console.log(all.map((m) => `${summary(m)}\n    ${m.uses} uses${m.last ? `, last ${m.last}` : ""}`).join("\n"));
       const unused = all.filter((m) => m.unused && m.scope !== "org");
       return unused.length && console.log(`\nNot used in 14+ days, consider \`agentmem rm <id>\`:\n${unused.map(summary).join("\n")}`);
+    }
+    case "guard-check": {
+      const base = flags.base || "HEAD^1";
+      const files = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" }).split("\n").filter(Boolean);
+      const hits = guardCheck(store, files);
+      const esc = (t) => t.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+      for (const h of hits) {
+        const reason = h.guards.map((m) => `${m.title}: ${m.body} (${m.id})`).join("\n");
+        console.log(process.env.GITHUB_ACTIONS ? `::${h.level} file=${h.file},title=agentmem guardrail::${esc(reason)}` : `${h.level}: ${h.file}\n  ${reason.replace(/\n/g, "\n  ")}`);
+      }
+      console.log(`${files.length} changed files checked, ${hits.length} guarded.`);
+      if (hits.some((h) => h.level === "error")) process.exitCode = 1;
+      return;
     }
     case "capture": {
       const result = capture(store, positional[0]);

@@ -55,6 +55,13 @@ export function guardDecision(store, filePath) {
   };
 }
 
+export function guardCheck(store, files) {
+  return files
+    .map((file) => ({ file, guards: store.guardsFor(file) }))
+    .filter((r) => r.guards.length)
+    .map((r) => ({ ...r, level: r.guards.some((m) => m.guard === "block") ? "error" : "warning" }));
+}
+
 export async function runHook(event) {
   if (process.env.AGENTMEM_CAPTURE) return;
   let raw = "";

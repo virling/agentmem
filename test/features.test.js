@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { buildPrompt, capture, fixedFailures } from "../src/capture.js";
-import { sessionStartContext } from "../src/hooks.js";
+import { guardCheck, sessionStartContext } from "../src/hooks.js";
 import { Store } from "../src/store.js";
 import { tmp } from "./helpers.js";
 
@@ -20,6 +20,14 @@ test("usage is counted and unused memories are flagged", () => {
   const later = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
   assert.equal(store.stats(later).find((m) => m.id === b).unused, true);
   assert.equal(store.stats(later).find((m) => m.id === a).unused, false);
+});
+
+test("guard check reports blocked and warned files", () => {
+  const store = new Store(tmp(), tmp());
+  store.write({ title: "Generated code", content: "Run codegen instead.", files: ["src/gen/**"], guard: "block" });
+  store.write({ title: "Migrations", content: "Append only.", files: ["db/*.sql"], guard: "warn" });
+  const hits = guardCheck(store, ["src/gen/api.ts", "db/001.sql", "README.md"]);
+  assert.deepEqual(hits.map((h) => [h.file, h.level]), [["src/gen/api.ts", "error"], ["db/001.sql", "warning"]]);
 });
 
 test("failed commands fixed by edits become gotcha hints", () => {
