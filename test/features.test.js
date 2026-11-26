@@ -116,7 +116,7 @@ test("guard-check cannot be bypassed by removing the guard, renaming, or unusual
   commit("base");
   const check = () => {
     try {
-      return { code: 0, out: execFileSync("node", [path.resolve("bin/agentmem.js"), "guard-check"], { cwd, encoding: "utf8", env: { ...process.env, AGENTMEM_HOME: tmp() } }) };
+      return { code: 0, out: execFileSync("node", [path.resolve("bin/agentmem.js"), "guard-check"], { cwd, encoding: "utf8", env: { ...process.env, AGENTMEM_HOME: tmp(), GITHUB_ACTIONS: "" } }) };
     } catch (err) {
       return { code: err.status, out: err.stdout };
     }
