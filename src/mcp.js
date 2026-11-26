@@ -152,7 +152,7 @@ function handle(msg) {
       return {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "agentmem", version: "0.6.1" },
+        serverInfo: { name: "agentmem", version: "0.6.2" },
         ...(warning && { instructions: warning }),
       };
     }
