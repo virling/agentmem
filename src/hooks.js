@@ -55,9 +55,10 @@ export function guardDecision(store, filePath) {
   };
 }
 
-export function guardCheck(store, files) {
+export function guardCheck(store, files, base) {
+  const guardsFor = (file) => [...new Map([...store.guardsFor(file), ...(base?.guardsFor(file) || [])].map((m) => [m.id, m])).values()];
   return files
-    .map((file) => ({ file, guards: store.guardsFor(file) }))
+    .map((file) => ({ file, guards: guardsFor(file) }))
     .filter((r) => r.guards.length)
     .map((r) => ({ ...r, level: r.guards.some((m) => m.guard === "block") ? "error" : "warning" }));
 }

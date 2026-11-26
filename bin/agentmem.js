@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { capture, findConflicts, logCapture } from "../src/capture.js";
 import { exportRules } from "../src/export.js";
 import { guardCheck, runHook } from "../src/hooks.js";
@@ -115,12 +117,13 @@ async function main() {
     }
     case "guard-check": {
       const base = flags.base || "HEAD^1";
-      const files = execFileSync("git", ["diff", "--name-only", base, "HEAD"], { encoding: "utf8" }).split("\n").filter(Boolean);
-      const hits = guardCheck(store, files);
+      const files = execFileSync("git", ["diff", "--name-only", "-z", "--no-renames", base, "HEAD"], { encoding: "utf8" }).split("\0").filter(Boolean);
+      const hits = guardCheck(store, files, baseStore(store, base));
       const esc = (t) => t.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+      const escProp = (t) => esc(t).replace(/:/g, "%3A").replace(/,/g, "%2C");
       for (const h of hits) {
         const reason = h.guards.map((m) => `${m.title}: ${m.body} (${m.id})`).join("\n");
-        console.log(process.env.GITHUB_ACTIONS ? `::${h.level} file=${h.file},title=agentmem guardrail::${esc(reason)}` : `${h.level}: ${h.file}\n  ${reason.replace(/\n/g, "\n  ")}`);
+        console.log(process.env.GITHUB_ACTIONS ? `::${h.level} file=${escProp(h.file)},title=agentmem guardrail::${esc(reason)}` : `${h.level}: ${h.file}\n  ${reason.replace(/\n/g, "\n  ")}`);
       }
       console.log(`${files.length} changed files checked, ${hits.length} guarded.`);
       if (hits.some((h) => h.level === "error")) process.exitCode = 1;
@@ -147,6 +150,15 @@ async function main() {
     default:
       console.log(HELP);
   }
+}
+
+// Team guards as of the base ref, so a change cannot remove the guard that covers it.
+function baseStore(store, base) {
+  const root = store.project.root;
+  if (!execFileSync("git", ["ls-tree", base, ".agentmem"], { cwd: root, encoding: "utf8" }).trim()) return null;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentmem-base-"));
+  execFileSync("tar", ["-x", "-C", dir], { input: execFileSync("git", ["archive", base, ".agentmem"], { cwd: root }) });
+  return Object.assign(Object.create(Object.getPrototypeOf(store)), store, { teamDir: path.join(dir, ".agentmem"), orgDirs: [] });
 }
 
 function org([sub, url]) {

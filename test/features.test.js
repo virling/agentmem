@@ -104,3 +104,36 @@ test("failed commands fixed by edits become gotcha hints", () => {
   capture(store, file, (prompt) => (seen.push(prompt), "[]"));
   assert.match(seen[0], /fixed by changing: src\/db\.js/);
 });
+
+test("guard-check cannot be bypassed by removing the guard, renaming, or unusual names", () => {
+  const cwd = tmp();
+  const run = (...args) => execFileSync("git", args, { cwd, stdio: "ignore" });
+  const commit = (msg) => (run("add", "-A"), run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", msg));
+  run("init", "-q");
+  fs.mkdirSync(path.join(cwd, "src/gen"), { recursive: true });
+  for (const f of ["src/gen/client.ts", "src/gen/über.ts"]) fs.writeFileSync(path.join(cwd, f), "x");
+  const id = new Store(cwd, tmp()).write({ title: "Generated", content: "Run codegen.", files: ["src/gen/**"], guard: "block", scope: "team" });
+  commit("base");
+  const check = () => {
+    try {
+      return { code: 0, out: execFileSync("node", [path.resolve("bin/agentmem.js"), "guard-check"], { cwd, encoding: "utf8", env: { ...process.env, AGENTMEM_HOME: tmp() } }) };
+    } catch (err) {
+      return { code: err.status, out: err.stdout };
+    }
+  };
+
+  fs.rmSync(path.join(cwd, ".agentmem", `${id}.md`));
+  fs.writeFileSync(path.join(cwd, "src/gen/client.ts"), "y");
+  commit("drop guard");
+  assert.equal(check().code, 1);
+
+  run("reset", "-q", "--hard", "HEAD^");
+  run("mv", "src/gen/client.ts", "src/client.ts");
+  commit("move out");
+  assert.match(check().out, /error: src\/gen\/client\.ts/);
+
+  run("reset", "-q", "--hard", "HEAD^");
+  fs.writeFileSync(path.join(cwd, "src/gen/über.ts"), "y");
+  commit("edit");
+  assert.match(check().out, /error: src\/gen\/über\.ts/);
+});
