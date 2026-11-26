@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-26
+
+### Fixed
+
+- `guard-check` also applies guards from the base ref, so a change cannot remove the guard that covers it.
+- `guard-check` flags files moved out of a guarded path and files with non-ASCII names.
+- The guard Action checks every commit of a push, not only the last one, and escapes file names in annotations.
+- Moving the `v0` tag no longer starts a failing release run.
+
 ## [0.6.0] - 2026-11-01
 
 ### Added
@@ -81,7 +90,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/virling/agentmem/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/virling/agentmem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/virling/agentmem/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/virling/agentmem/compare/v0.3.0...v0.4.0
