@@ -13,4 +13,12 @@ runs:
         node-version: 22
     - name: Check guarded files
       shell: bash
-      run: node "$GITHUB_ACTION_PATH/../bin/agentmem.js" guard-check --base HEAD^1
+      env:
+        BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
+      run: |
+        base=HEAD^1
+        if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+          git fetch --quiet --depth=1 origin "$BEFORE"
+          base="$BEFORE"
+        fi
+        node "$GITHUB_ACTION_PATH/../bin/agentmem.js" guard-check --base "$base"
