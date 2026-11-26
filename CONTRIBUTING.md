@@ -96,6 +96,7 @@ Publishing is automated by `.github/workflows/release.yml`.
 1. Move the `[Unreleased]` entries in CHANGELOG.md under a new version heading and commit.
 2. `npm version <patch|minor|major>` (bumps package.json, commits, tags `vX.Y.Z`).
 3. `git push --follow-tags`
+4. Move the major tag that the GitHub Actions use: `git tag -f -s v0 -m v0 vX.Y.Z^{} && git push -f origin refs/tags/v0`
 
 The workflow runs the tests, publishes to npm with provenance, and creates the GitHub release from the CHANGELOG section. It uses npm trusted publishing (OIDC), so no npm token is stored in the repo. The trusted publisher is configured on npmjs.com for `virling/agentmem` and `release.yml`.
 
