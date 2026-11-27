@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { TYPES } from "./store.js";
 
-export function extractTranscript(file, maxChars = 40000) {
+const CHUNK_CHARS = 200000;
+const MAX_CHUNKS = 4;
+
+export function extractTranscript(file, maxChars = CHUNK_CHARS * MAX_CHUNKS) {
   const parts = [];
   for (const line of fs.readFileSync(file, "utf8").split("\n")) {
     if (!line.trim()) continue;
@@ -22,6 +25,19 @@ export function extractTranscript(file, maxChars = 40000) {
     if (text.trim() && !text.startsWith("<")) parts.push(`${role.toUpperCase()}: ${text.trim()}`);
   }
   return parts.join("\n\n").slice(-maxChars);
+}
+
+export function chunks(text, size = CHUNK_CHARS) {
+  const out = [];
+  let cur = "";
+  for (const part of text.split("\n\n")) {
+    if (cur && cur.length + part.length + 2 > size) {
+      out.push(cur);
+      cur = "";
+    }
+    cur = cur ? `${cur}\n\n${part}` : part;
+  }
+  return [...out, cur];
 }
 
 function resultText(content) {
@@ -62,9 +78,9 @@ export function fixedFailures(file) {
   return fixes;
 }
 
-export function buildPrompt(transcript, existingTitles, fixes = []) {
+export function buildPrompt(transcript, existingTitles, fixes = [], part = null) {
   return `You extract durable project memory from a coding session transcript.
-
+${part ? `\nThe session is long, so this is part ${part.n} of ${part.of}, in order.\n` : ""}
 Return ONLY a JSON array (no prose, no code fence). Each item: {"title": string, "content": string, "type": one of ${JSON.stringify(TYPES)}, "files": [repo-relative paths, optional]}.
 
 Keep only facts that will still matter in a future session: decisions and why, project conventions, gotchas and their fixes, open todos. Skip chit-chat, one-off debugging steps, anything already in the existing list, and anything secret. At most 5 items.
@@ -100,14 +116,19 @@ export function capture(store, transcriptPath, runModel = askClaude) {
   const transcript = extractTranscript(transcriptPath);
   const fixes = fixedFailures(transcriptPath).map((f) => ({ ...f, files: f.files.map((p) => store.relative(p)) }));
   if (transcript.length < 500 && !fixes.length) return { saved: [], skipped: ["transcript too short"] };
-  const items = parseItems(runModel(buildPrompt(transcript, store.list().map((m) => m.title), fixes)));
+  const parts = chunks(transcript).slice(-MAX_CHUNKS);
   const saved = [];
   const skipped = [];
-  for (const item of items) {
-    try {
-      saved.push(store.write({ ...item, type: TYPES.includes(item.type) ? item.type : "note", agent: "auto-capture" }));
-    } catch (err) {
-      skipped.push(`${item.title}: ${err.message}`);
+  for (const [i, text] of parts.entries()) {
+    const last = i === parts.length - 1;
+    const part = parts.length > 1 ? { n: i + 1, of: parts.length } : null;
+    const items = parseItems(runModel(buildPrompt(text, store.list().map((m) => m.title), last ? fixes : [], part)));
+    for (const item of items.filter((it) => last || it.type !== "handoff")) {
+      try {
+        saved.push(store.write({ ...item, type: TYPES.includes(item.type) ? item.type : "note", agent: "auto-capture" }));
+      } catch (err) {
+        skipped.push(`${item.title}: ${err.message}`);
+      }
     }
   }
   return { saved, skipped };

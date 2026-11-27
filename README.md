@@ -208,10 +208,10 @@ Run `agentmem` with no arguments in a terminal to see the full help.
 
 When a Claude Code session ends, agentmem:
 
-1. Reads the session transcript (user and assistant text only, last 40k characters).
-2. Sends it to `claude -p --model haiku` with no tools and no MCP servers.
+1. Reads the session transcript (user and assistant text only, last 800k characters).
+2. Sends it in parts of up to 200k characters to `claude -p --model haiku` with no tools and no MCP servers.
 3. Points out commands that failed and then passed after a file was edited, so the fix can be saved as a gotcha linked to those files.
-4. Saves up to 5 durable facts with `agent: auto-capture`. Secrets and near-duplicates are skipped. If work was left unfinished, it also writes a [handoff](#handoffs-between-agents).
+4. Saves up to 5 durable facts per part with `agent: auto-capture`. Secrets and near-duplicates are skipped. If work was left unfinished, it also writes a [handoff](#handoffs-between-agents).
 5. Appends the result to `capture.log` in the project's storage folder.
 
 Run it by hand on any transcript:
@@ -220,7 +220,7 @@ Run it by hand on any transcript:
 agentmem capture ~/.claude/projects/<project>/<session-id>.jsonl
 ```
 
-Auto-capture uses your logged-in Claude Code account. Each run is one small Haiku call.
+Auto-capture uses your logged-in Claude Code account. Each run is one Haiku call per 200k characters of conversation, at most 4. Only the last part can write a handoff.
 
 ## Team memory
 
