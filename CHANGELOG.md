@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-27
+
+### Added
+
+- Auto-capture reads long sessions in parts: up to the last 800k characters, one Haiku call per 200k, at most 4. Previously only the last 40k characters were read.
+- Auto-capture includes the session's subagent transcripts, ahead of the main session so the main session is kept when the total is too long.
+- Session start reminds the agent to suggest `agentmem stats` when memories have not been used in 14+ days.
+
+### Changed
+
+- Node.js 20 or newer is required. Node 18 is end-of-life and no longer tested.
+- The GitHub Actions use `actions/checkout` and `actions/setup-node` v7.
+- The `v0` tag is moved to each new release automatically.
+
+### Fixed
+
+- `guard-check` no longer fails intermittently on macOS (`spawnSync tar ENOTCONN`).
+
 ## [0.6.2] - 2026-11-26
 
 ### Fixed
@@ -90,7 +108,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/virling/agentmem/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/virling/agentmem/compare/v0.6.0...v0.6.2
 [0.6.0]: https://github.com/virling/agentmem/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/virling/agentmem/compare/v0.4.0...v0.5.0
