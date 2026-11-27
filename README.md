@@ -59,7 +59,7 @@ Other agent ─┘                      └─► <repo>/.agentmem/*.md         
 
 ## Requirements
 
-- Node.js 18 or newer
+- Node.js 20 or newer
 - git (optional, used to identify the project)
 - Claude Code CLI (optional, only for hooks and auto-capture)
 

@@ -11,7 +11,7 @@
     "version": "node scripts/sync-version.js && git add .claude-plugin"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "license": "PolyForm-Noncommercial-1.0.0",
   "keywords": [
