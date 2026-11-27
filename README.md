@@ -42,6 +42,7 @@ Memory that lives with your code: reviewed in pull requests, enforced as guardra
 - [Troubleshooting](#troubleshooting)
 - [Uninstall](#uninstall)
 - [Contributing](#contributing)
+- [More tools from Virling](#more-tools-from-virling)
 - [License](#license)
 
 ## How it works
@@ -453,6 +454,13 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for what each module does.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## More tools from Virling
+
+- [ccdoctor](https://github.com/virling/ccdoctor): checks your Claude Code setup: hooks, MCP servers and plugins that are registered but not working.
+- [ciwhy](https://github.com/virling/ciwhy): finds the real error in a failed GitHub Actions run and tells you if it is flaky.
+- [npmship](https://github.com/virling/npmship): releases an npm package and verifies it landed on npm, in CI and on GitHub.
+- [subagents](https://github.com/virling/subagents): reviews what Claude Code subagents did in a session and flags repeated or wasted work.
 
 ## License
 
