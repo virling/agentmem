@@ -38,3 +38,11 @@ jobs:
           VERSION="${TAG#v}"
           awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes-file notes.md
+      - name: Move the major tag used by the GitHub Actions
+        run: |
+          MAJOR="${TAG%%.*}"
+          LATEST=$(git ls-remote --tags --refs origin "$MAJOR.*" | sed 's|.*refs/tags/||' | sort -V | tail -1)
+          if [ "$LATEST" = "$TAG" ]; then
+            git tag -f "$MAJOR" HEAD
+            git push -f origin "refs/tags/$MAJOR"
+          fi
