@@ -276,7 +276,7 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - uses: virling/agentmem/guard@v0
@@ -361,7 +361,7 @@ jobs:
     if: github.event.pull_request.merged
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.ref }}
       - uses: virling/agentmem@v0
