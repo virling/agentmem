@@ -125,7 +125,9 @@ test("guard-check cannot be bypassed by removing the guard, renaming, or unusual
   fs.rmSync(path.join(cwd, ".agentmem", `${id}.md`));
   fs.writeFileSync(path.join(cwd, "src/gen/client.ts"), "y");
   commit("drop guard");
-  assert.equal(check().code, 1);
+  const dropped = check();
+  assert.equal(dropped.code, 1);
+  assert.match(dropped.out, /error: src\/gen\/client\.ts/);
 
   run("reset", "-q", "--hard", "HEAD^");
   run("mv", "src/gen/client.ts", "src/client.ts");

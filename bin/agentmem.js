@@ -157,7 +157,8 @@ function baseStore(store, base) {
   const root = store.project.root;
   if (!execFileSync("git", ["ls-tree", base, ".agentmem"], { cwd: root, encoding: "utf8" }).trim()) return null;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentmem-base-"));
-  execFileSync("tar", ["-x", "-C", dir], { input: execFileSync("git", ["archive", base, ".agentmem"], { cwd: root }) });
+  execFileSync("git", ["archive", "-o", path.join(dir, "base.tar"), base, ".agentmem"], { cwd: root });
+  execFileSync("tar", ["-xf", path.join(dir, "base.tar"), "-C", dir]);
   return Object.assign(Object.create(Object.getPrototypeOf(store)), store, { teamDir: path.join(dir, ".agentmem"), orgDirs: [] });
 }
 
