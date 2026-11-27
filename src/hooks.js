@@ -24,6 +24,8 @@ export function sessionStartContext(store) {
   if (rest.length) lines.push("", "Index:", ...rest.map(summary));
   if (all.some((m) => m.stale.length || m.changed.length))
     lines.push("", "Some memories reference files that are missing or changed since they were written: check them, then memory_update (re-verifies) or memory_delete.");
+  const unused = store.stats().filter((m) => m.unused && m.scope !== "org").length;
+  if (unused) lines.push("", `${unused} memories have not been used in 14+ days. Tell the user they can review them with: agentmem stats`);
   return lines.join("\n");
 }
 
