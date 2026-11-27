@@ -13,6 +13,14 @@
       "version": "0.7.0",
       "source": "./",
       "description": "Project memory shared by every AI coding agent: team memory in git, guardrails, handoffs, auto-capture"
+    },
+    {
+      "name": "ccdoctor",
+      "source": {
+        "source": "github",
+        "repo": "virling/ccdoctor"
+      },
+      "description": "Warns at session start when your Claude Code hooks, MCP servers or plugins are broken or not wired up"
     }
   ]
 }
