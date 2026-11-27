@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { capture, chunks, extractTranscript, findConflicts, parseItems } from "../src/capture.js";
+import { capture, chunks, extractTranscript, findConflicts, parseItems, subagentTranscripts } from "../src/capture.js";
 import { Store } from "../src/store.js";
 import { tmp } from "./helpers.js";
 
@@ -55,6 +55,20 @@ test("long sessions are captured in parts with the handoff from the last part on
   const titles = store.list().map((m) => m.title);
   assert.deepEqual(titles.filter((t) => t.startsWith("Handoff")), ["Handoff part 4"]);
   assert.deepEqual(titles.filter((t) => facts.includes(t)).sort(), [...facts].sort());
+});
+
+test("subagent sessions are captured before the main session", () => {
+  const store = new Store(tmp(), tmp());
+  const dir = tmp();
+  const file = path.join(dir, "s1.jsonl");
+  const say = (text) => JSON.stringify({ message: { role: "assistant", content: text } });
+  fs.writeFileSync(file, say(`Main session work. ${"m".repeat(600)}`));
+  fs.mkdirSync(path.join(dir, "s1", "subagents"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "s1", "subagents", "agent-a.jsonl"), say("Subagent found the flaky tar pipe."));
+  assert.equal(subagentTranscripts(file).length, 1);
+  let prompt = "";
+  capture(store, file, (p) => ((prompt = p), "[]"));
+  assert.match(prompt, /SUBAGENT SESSION:\nASSISTANT: Subagent found the flaky tar pipe\.[\s\S]*Main session work/);
 });
 
 test("parseItems handles junk", () => {

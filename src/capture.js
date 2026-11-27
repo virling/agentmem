@@ -112,9 +112,18 @@ export function parseItems(output, raw = false) {
   return raw ? items.filter(Boolean) : items.filter((i) => i && i.title && i.content);
 }
 
+export function subagentTranscripts(transcriptPath) {
+  const dir = path.join(transcriptPath.replace(/\.jsonl$/, ""), "subagents");
+  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).sort().map((f) => path.join(dir, f)) : [];
+}
+
 export function capture(store, transcriptPath, runModel = askClaude) {
-  const transcript = extractTranscript(transcriptPath);
-  const fixes = fixedFailures(transcriptPath).map((f) => ({ ...f, files: f.files.map((p) => store.relative(p)) }));
+  const subagents = subagentTranscripts(transcriptPath);
+  // Subagent text goes first so the main session survives the length cut.
+  const transcript = [...subagents.map((f) => `SUBAGENT SESSION:\n${extractTranscript(f)}`), extractTranscript(transcriptPath)]
+    .join("\n\n")
+    .slice(-CHUNK_CHARS * MAX_CHUNKS);
+  const fixes = [...subagents, transcriptPath].flatMap(fixedFailures).map((f) => ({ ...f, files: f.files.map((p) => store.relative(p)) }));
   if (transcript.length < 500 && !fixes.length) return { saved: [], skipped: ["transcript too short"] };
   const parts = chunks(transcript).slice(-MAX_CHUNKS);
   const saved = [];
