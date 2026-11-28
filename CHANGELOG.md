@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- Git worktrees (for example subagent worktrees under `.claude/worktrees/`) share the main checkout's memory store.
+- `memory_write` with absolute file paths in another git repo saves the memory in that repo, and auto-capture does the same for each item.
+- `memory_handoff` takes `resolves`, a list of todo ids the work finished, and deletes them. Its reply lists the remaining open todos.
+
+### Fixed
+
+- `memory_update` stores absolute in-repo paths as repo-relative, so file hints and guards match.
+- A failed auto-capture (no `claude` CLI, timeout, bad output) is written to `capture.log` instead of being lost.
+- `agentmem show` and `agentmem capture` without an argument print usage instead of a stack trace.
+- The MCP server reports the package version instead of a fixed one.
+- Prerelease versions publish under the `next` npm tag.
+
 ## [0.7.0] - 2026-11-27
 
 ### Added
