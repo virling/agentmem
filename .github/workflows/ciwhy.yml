@@ -13,4 +13,4 @@ jobs:
       actions: read
       pull-requests: write
     steps:
-      - uses: virling/ciwhy@v0
+      - uses: virling/ciwhy@fb039ec0d05bc5644dcc15314a8b44a33627d53f # v0.2.2
