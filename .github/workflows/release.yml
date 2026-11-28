@@ -30,7 +30,15 @@ jobs:
         run: test "v$(node -p 'require("./package.json").version')" = "$TAG"
       - run: npm test
       - name: Publish to npm (trusted publishing)
-        run: npm publish --provenance --access public
+        run: |
+          NAME="$(node -p 'require("./package.json").name')"
+          if npm view "$NAME@${TAG#v}" version >/dev/null 2>&1; then
+            echo "Already on npm"
+          elif [[ "$TAG" == *-* ]]; then
+            npm publish --provenance --access public --tag next
+          else
+            npm publish --provenance --access public
+          fi
       - name: Create GitHub release from CHANGELOG
         env:
           GH_TOKEN: ${{ github.token }}
