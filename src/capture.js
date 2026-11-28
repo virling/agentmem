@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { TYPES } from "./store.js";
+import { Store, TYPES, repoOfFiles } from "./store.js";
 
 const CHUNK_CHARS = 200000;
 const MAX_CHUNKS = 4;
@@ -81,7 +81,7 @@ export function fixedFailures(file) {
 export function buildPrompt(transcript, existingTitles, fixes = [], part = null) {
   return `You extract durable project memory from a coding session transcript.
 ${part ? `\nThe session is long, so this is part ${part.n} of ${part.of}, in order.\n` : ""}
-Return ONLY a JSON array (no prose, no code fence). Each item: {"title": string, "content": string, "type": one of ${JSON.stringify(TYPES)}, "files": [repo-relative paths, optional]}.
+Return ONLY a JSON array (no prose, no code fence). Each item: {"title": string, "content": string, "type": one of ${JSON.stringify(TYPES)}, "files": [absolute paths, optional]}.
 
 Keep only facts that will still matter in a future session: decisions and why, project conventions, gotchas and their fixes, open todos. Skip chit-chat, one-off debugging steps, anything already in the existing list, and anything secret. At most 5 items.
 
@@ -123,7 +123,7 @@ export function capture(store, transcriptPath, runModel = askClaude) {
   const transcript = [...subagents.map((f) => `SUBAGENT SESSION:\n${extractTranscript(f)}`), extractTranscript(transcriptPath)]
     .join("\n\n")
     .slice(-CHUNK_CHARS * MAX_CHUNKS);
-  const fixes = [...subagents, transcriptPath].flatMap(fixedFailures).map((f) => ({ ...f, files: f.files.map((p) => store.relative(p)) }));
+  const fixes = [...subagents, transcriptPath].flatMap(fixedFailures);
   if (transcript.length < 500 && !fixes.length) return { saved: [], skipped: ["transcript too short"] };
   const parts = chunks(transcript).slice(-MAX_CHUNKS);
   const saved = [];
@@ -134,7 +134,9 @@ export function capture(store, transcriptPath, runModel = askClaude) {
     const items = parseItems(runModel(buildPrompt(text, store.list().map((m) => m.title), last ? fixes : [], part)));
     for (const item of items.filter((it) => last || it.type !== "handoff")) {
       try {
-        saved.push(store.write({ ...item, type: TYPES.includes(item.type) ? item.type : "note", agent: "auto-capture" }));
+        const root = repoOfFiles(item.files, store.project.root);
+        const target = root ? new Store(root, path.dirname(store.dir)) : store;
+        saved.push(`${target === store ? "" : `${target.project.name}:`}${target.write({ ...item, type: TYPES.includes(item.type) ? item.type : "note", agent: "auto-capture" })}`);
       } catch (err) {
         skipped.push(`${item.title}: ${err.message}`);
       }

@@ -45,11 +45,21 @@ export function orgRepos(home) {
 
 export function projectKey(cwd) {
   const remote = git(cwd, ["remote", "get-url", "origin"]);
-  const root = git(cwd, ["rev-parse", "--show-toplevel"]) || path.resolve(cwd);
-  const source = remote ? normalizeRemote(remote) : root;
-  const name = path.basename(root);
+  const [top, common, gitDir] = git(cwd, ["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", "--git-dir"]).split("\n");
+  const root = top || path.resolve(cwd);
+  const main = common !== gitDir && path.basename(common) === ".git" ? path.dirname(common) : root;
+  const source = remote ? normalizeRemote(remote) : main;
+  const name = path.basename(main);
   const hash = createHash("sha256").update(source).digest("hex").slice(0, 12);
-  return { id: `${name}-${hash}`, name, source, root };
+  return { id: `${name}-${hash}`, name, source, root, git: Boolean(top) };
+}
+
+export function repoOfFiles(files, home) {
+  if (!Array.isArray(files) || !files.length || !files.every((f) => path.isAbsolute(f) && fs.existsSync(path.dirname(f)))) return undefined;
+  const keys = files.map((f) => projectKey(path.dirname(f)));
+  const roots = new Set(keys.map((k) => k.root));
+  const [root] = roots;
+  return roots.size === 1 && keys[0].git && root !== home ? root : undefined;
 }
 
 function slugify(text) {
@@ -183,7 +193,7 @@ export class Store {
     const date = new Date().toLocaleDateString("sv");
     let id = `${date}-${slugify(title)}`;
     for (let n = 2; SCOPES.some((s) => fs.existsSync(path.join(this.dirFor(s), `${id}.md`))); n++) id = `${date}-${slugify(title)}-${n}`;
-    const fileList = toList(files);
+    const fileList = this.repoFiles(files);
     const meta = { title, type, agent, date, pinned, guard, files: fileList, tags: toList(tags), hashes: this.hashes(fileList) };
     fs.writeFileSync(path.join(dir, `${id}.md`), serialize(meta, content));
     return id;
@@ -195,7 +205,8 @@ export class Store {
     this.validate(fields);
     this.checkSecrets(fields.title, fields.content);
     for (const key of ["title", "type", "pinned", "guard"]) if (fields[key] !== undefined) meta[key] = fields[key];
-    for (const key of ["files", "tags"]) if (fields[key] !== undefined) meta[key] = toList(fields[key]);
+    if (fields.files !== undefined) meta.files = this.repoFiles(fields.files);
+    if (fields.tags !== undefined) meta.tags = toList(fields.tags);
     meta.hashes = this.hashes(meta.files);
     meta.updated = new Date().toLocaleDateString("sv");
     fs.writeFileSync(file, serialize(meta, fields.content ?? body));
@@ -254,6 +265,10 @@ export class Store {
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((r) => r.m);
+  }
+
+  repoFiles(files) {
+    return toList(files).map((f) => (path.isAbsolute(f) && !this.relative(f).startsWith("..") ? this.relative(f) : f));
   }
 
   relative(filePath) {

@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { Store, globToRegex } from "../src/store.js";
+import { Store, globToRegex, repoOfFiles } from "../src/store.js";
 import { tmp } from "./helpers.js";
+
+const bin = new URL("../bin/agentmem.js", import.meta.url).pathname;
 
 test("write, list, search, read, delete", () => {
   const store = new Store(tmp(), tmp());
@@ -125,4 +128,73 @@ test("related finds memories on the same topic or files", () => {
 test("npm tokens are treated as secrets", () => {
   const store = new Store(tmp(), tmp());
   assert.throws(() => store.write({ title: "t", content: "npm_G9lqHZhaeXeqo5ZHwX2k5SeqNNrymm0b04Cx" }), /secret/);
+});
+
+test("a git worktree shares the main checkout's store", () => {
+  const repo = path.join(tmp(), "proj");
+  fs.mkdirSync(repo);
+  const git = (...args) => execFileSync("git", args, { cwd: repo, stdio: "ignore" });
+  git("init", "-q");
+  git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
+  git("worktree", "add", "-q", path.join(repo, ".claude", "worktrees", "agent-1"));
+  const home = tmp();
+  const main = new Store(repo, home);
+  const wt = new Store(path.join(repo, ".claude", "worktrees", "agent-1"), home);
+  assert.equal(wt.project.id, main.project.id);
+  assert.equal(wt.project.root, fs.realpathSync(path.join(repo, ".claude", "worktrees", "agent-1")));
+});
+
+test("files in another git repo pick that repo and are stored relative to it", () => {
+  const other = fs.realpathSync(tmp());
+  execFileSync("git", ["init", "-q"], { cwd: other });
+  fs.mkdirSync(path.join(other, "src"));
+  fs.writeFileSync(path.join(other, "src", "a.js"), "1");
+  const file = path.join(other, "src", "a.js");
+  const plain = fs.realpathSync(tmp());
+  fs.writeFileSync(path.join(plain, "b.js"), "1");
+  assert.equal(repoOfFiles([file], "/elsewhere"), other);
+  assert.equal(repoOfFiles([file], other), undefined);
+  assert.equal(repoOfFiles(["src/a.js"], "/elsewhere"), undefined);
+  assert.equal(repoOfFiles(file, "/elsewhere"), undefined);
+  assert.equal(repoOfFiles([path.join(plain, "b.js")], "/elsewhere"), undefined);
+  const store = new Store(other, tmp());
+  const id = store.write({ title: "Routed", content: "x", files: [file] });
+  assert.match(store.read(id), /files: src\/a\.js/);
+  store.update(id, { files: [file] });
+  assert.equal(store.forFile("src/a.js").length, 1);
+});
+
+test("captured items about another repo's files are saved in that repo", async () => {
+  const { capture } = await import("../src/capture.js");
+  const home = tmp();
+  const here = new Store(tmp(), home);
+  const other = fs.realpathSync(tmp());
+  execFileSync("git", ["init", "-q"], { cwd: other });
+  fs.writeFileSync(path.join(other, "a.js"), "1");
+  const transcript = path.join(tmp(), "s.jsonl");
+  fs.writeFileSync(transcript, JSON.stringify({ message: { role: "user", content: "x".repeat(600) } }));
+  const out = JSON.stringify([{ title: "Other repo fact", content: "y", type: "gotcha", files: [path.join(other, "a.js")] }, { title: "Here fact", content: "z", type: "note" }]);
+  const { saved } = capture(here, transcript, () => out);
+  assert.equal(saved.length, 2);
+  assert.deepEqual(here.list().map((m) => m.title), ["Here fact"]);
+  assert.deepEqual(new Store(other, home).list().map((m) => [m.title, m.files.join()]), [["Other repo fact", "a.js"]]);
+});
+
+test("memory_update with absolute files stays in the current store", () => {
+  const home = tmp();
+  const dir = fs.realpathSync(tmp());
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  const other = fs.realpathSync(tmp());
+  execFileSync("git", ["init", "-q"], { cwd: other });
+  fs.writeFileSync(path.join(other, "a.js"), "1");
+  const store = new Store(dir, home);
+  const id = store.write({ title: "Local fact", content: "x" });
+  const args = { id, files: [path.join(other, "a.js")] };
+  const out = execFileSync("node", [bin, "mcp"], {
+    cwd: dir,
+    env: { ...process.env, AGENTMEM_HOME: home },
+    input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_update", arguments: args } })}\n`,
+    encoding: "utf8",
+  });
+  assert.match(out, new RegExp(`Updated ${id}`));
 });

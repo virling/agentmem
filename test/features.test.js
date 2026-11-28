@@ -102,7 +102,7 @@ test("failed commands fixed by edits become gotcha hints", () => {
 
   const seen = [];
   capture(store, file, (prompt) => (seen.push(prompt), "[]"));
-  assert.match(seen[0], /fixed by changing: src\/db\.js/);
+  assert.match(seen[0], /fixed by changing: \/.*\/src\/db\.js/);
 });
 
 test("guard-check cannot be bypassed by removing the guard, renaming, or unusual names", () => {

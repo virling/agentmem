@@ -1,7 +1,11 @@
+import fs from "node:fs";
 import readline from "node:readline";
 import { handoffText } from "./hooks.js";
 import { claudeHookWarning } from "./install.js";
-import { GUARDS, SCOPES, Store, TYPES, summary } from "./store.js";
+import { GUARDS, SCOPES, Store, TYPES, projectKey, repoOfFiles, summary } from "./store.js";
+
+const HOME_ROOT = projectKey(process.cwd()).root;
+const { version } = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 const stores = new Map();
 function storeFor(projectPath) {
@@ -12,13 +16,13 @@ function storeFor(projectPath) {
 
 const projectPath = {
   type: "string",
-  description: "Absolute path of the project. Only needed if the server was not started inside the project.",
+  description: "Absolute path of the repo this is about. Defaults to the folder the session started in; set it when the work is in another repo.",
 };
 const fields = {
   title: { type: "string" },
   content: { type: "string" },
   type: { type: "string", enum: TYPES },
-  files: { type: "array", items: { type: "string" }, description: "Repo-relative files this memory is about" },
+  files: { type: "array", items: { type: "string" }, description: "Files this memory is about, repo-relative or absolute (absolute paths in another repo save it there)" },
   tags: { type: "array", items: { type: "string" } },
   pinned: { type: "boolean", description: "Always show this memory at session start" },
   guard: {
@@ -108,7 +112,8 @@ export function writeHandoff(store, { summary: done, next_steps, files, agent = 
 }
 
 function call(name, args = {}) {
-  const store = storeFor(args.project_path);
+  const routed = name === "memory_write" && !args.project_path ? repoOfFiles(args.files, HOME_ROOT) : undefined;
+  const store = storeFor(args.project_path || routed);
   switch (name) {
     case "memory_list": {
       const all = store.list();
@@ -127,9 +132,10 @@ function call(name, args = {}) {
     case "memory_write": {
       const id = store.write(args);
       const related = store.related(args, id);
+      const saved = `Saved ${id}${routed ? ` in ${store.project.name}` : ""}`;
       return related.length
-        ? `Saved ${id}\nRelated memories, check none of them contradict the new one (update or delete if they do):\n${related.map(summary).join("\n")}`
-        : `Saved ${id}`;
+        ? `${saved}\nRelated memories, check none of them contradict the new one (update or delete if they do):\n${related.map(summary).join("\n")}`
+        : saved;
     }
     case "memory_handoff":
       return `Saved handoff ${writeHandoff(store, args)}. The next session in any agent will see it first.`;
@@ -152,7 +158,7 @@ function handle(msg) {
       return {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "agentmem", version: "0.7.0" },
+        serverInfo: { name: "agentmem", version },
         ...(warning && { instructions: warning }),
       };
     }
