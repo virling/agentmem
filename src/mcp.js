@@ -89,6 +89,7 @@ const tools = [
         next_steps: { type: "string", description: "What to do next, in order" },
         files: { type: "array", items: { type: "string" } },
         agent: { type: "string" },
+        resolves: { type: "array", items: { type: "string" }, description: "Ids of todo memories this work finished; they are deleted" },
         project_path: projectPath,
       },
       required: ["summary", "next_steps"],
@@ -137,8 +138,19 @@ function call(name, args = {}) {
         ? `${saved}\nRelated memories, check none of them contradict the new one (update or delete if they do):\n${related.map(summary).join("\n")}`
         : saved;
     }
-    case "memory_handoff":
-      return `Saved handoff ${writeHandoff(store, args)}. The next session in any agent will see it first.`;
+    case "memory_handoff": {
+      const open = new Set(store.list().filter((m) => m.type === "todo").map((m) => m.id));
+      const resolves = args.resolves || [];
+      const deleted = resolves.filter((id) => open.has(id));
+      const unknown = resolves.filter((id) => !open.has(id));
+      const lines = [`Saved handoff ${writeHandoff(store, args)}. The next session in any agent will see it first.`];
+      for (const id of deleted) store.delete(id);
+      if (deleted.length) lines.push(`Deleted finished todos: ${deleted.join(", ")}`);
+      if (unknown.length) lines.push(`Not open todos, left alone: ${unknown.join(", ")}`);
+      const todos = store.list().filter((m) => m.type === "todo");
+      if (todos.length) lines.push("Open todos, delete any this work finished (memory_delete):", ...todos.map(summary));
+      return lines.join("\n");
+    }
     case "memory_promote":
       return `Promoted ${store.promote(args.id)} to ${store.teamDir}. Commit it to share with the team.`;
     case "memory_update":

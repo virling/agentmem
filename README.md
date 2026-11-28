@@ -160,7 +160,7 @@ At the start of each task call memory_list. Save durable decisions, conventions 
 | `memory_write` | `title`, `content`, `type`, `files`, `tags`, `pinned`, `guard`, `scope`, `agent`, `force` | Save one fact. Returns related memories to check for contradictions |
 | `memory_update` | `id` plus any field to change | Edit a memory in place. With only `id`, re-verifies it against its files |
 | `memory_promote` | `id` | Move a local memory into the repo's `.agentmem/` folder |
-| `memory_handoff` | `summary`, `next_steps`, `files`, `agent` | Leave a note for the next session in any agent. Replaces the previous handoff |
+| `memory_handoff` | `summary`, `next_steps`, `files`, `agent`, `resolves` | Leave a note for the next session in any agent. Replaces the previous handoff and deletes the todos listed in `resolves` |
 | `memory_delete` | `id` | Remove a memory |
 
 Every tool also accepts an optional `project_path`.

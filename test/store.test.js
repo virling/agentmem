@@ -180,6 +180,43 @@ test("captured items about another repo's files are saved in that repo", async (
   assert.deepEqual(new Store(other, home).list().map((m) => [m.title, m.files.join()]), [["Other repo fact", "a.js"]]);
 });
 
+test("memory_handoff deletes resolved todos only and lists the open ones", () => {
+  const home = tmp();
+  const dir = fs.realpathSync(tmp());
+  const store = new Store(dir, home);
+  const done = store.write({ title: "Ship the thing", content: "x", type: "todo" });
+  store.write({ title: "Write docs for the thing", content: "x", type: "todo" });
+  const decision = store.write({ title: "Use tabs", content: "x", type: "decision" });
+  const msg = (body) =>
+    execFileSync("node", [bin, "mcp"], {
+      cwd: dir,
+      env: { ...process.env, AGENTMEM_HOME: home },
+      input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_handoff", arguments: body } })}\n`,
+      encoding: "utf8",
+    });
+  const out = msg({ summary: "s", next_steps: "n", resolves: [done, decision, "nope"] });
+  assert.match(out, new RegExp(`Deleted finished todos: ${done}`));
+  assert.match(out, /Not open todos, left alone: .*use-tabs, nope/);
+  assert.match(out, /Open todos.*\\n.*Write docs for the thing/);
+  assert.deepEqual(store.list().map((m) => m.type).sort(), ["decision", "handoff", "todo"]);
+});
+
+test("a refused handoff keeps the todos it would resolve", () => {
+  const home = tmp();
+  const dir = fs.realpathSync(tmp());
+  const store = new Store(dir, home);
+  const todo = store.write({ title: "Ship the thing", content: "x", type: "todo" });
+  const args = { summary: "token sk-abcdefghijklmnopqrstuvwxyz123456", next_steps: "n", resolves: [todo] };
+  const out = execFileSync("node", [bin, "mcp"], {
+    cwd: dir,
+    env: { ...process.env, AGENTMEM_HOME: home },
+    input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "memory_handoff", arguments: args } })}\n`,
+    encoding: "utf8",
+  });
+  assert.match(out, /secret/);
+  assert.deepEqual(store.list().map((m) => m.id), [todo]);
+});
+
 test("memory_update with absolute files stays in the current store", () => {
   const home = tmp();
   const dir = fs.realpathSync(tmp());
