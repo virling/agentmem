@@ -71,6 +71,7 @@ async function main() {
       return console.log(hits.length ? hits.map(summary).join("\n") : "No matches.");
     }
     case "show":
+      if (!positional[0]) throw new Error("usage: agentmem show <id>");
       store.touch([positional[0]]);
       return console.log(store.read(positional[0]));
     case "add": {
@@ -130,7 +131,14 @@ async function main() {
       return;
     }
     case "capture": {
-      const result = capture(store, positional[0]);
+      if (!positional[0]) throw new Error("usage: agentmem capture <transcript.jsonl>");
+      let result;
+      try {
+        result = capture(store, positional[0]);
+      } catch (err) {
+        logCapture(store, positional[0], { error: err.message });
+        throw err;
+      }
       logCapture(store, positional[0], result);
       return console.log(JSON.stringify(result));
     }

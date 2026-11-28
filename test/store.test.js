@@ -235,3 +235,26 @@ test("memory_update with absolute files stays in the current store", () => {
   });
   assert.match(out, new RegExp(`Updated ${id}`));
 });
+
+test("show and capture without an argument print usage", () => {
+  for (const cmd of ["show", "capture"]) {
+    let err;
+    try {
+      execFileSync("node", [bin, cmd], { cwd: tmp(), env: { ...process.env, AGENTMEM_HOME: tmp() }, encoding: "utf8", stdio: "pipe" });
+    } catch (e) {
+      err = e;
+    }
+    assert.match(err.stderr, new RegExp(`usage: agentmem ${cmd}`));
+  }
+});
+
+test("a failed capture is written to capture.log", () => {
+  const home = tmp();
+  const dir = fs.realpathSync(tmp());
+  const transcript = path.join(dir, "s.jsonl");
+  fs.writeFileSync(transcript, JSON.stringify({ message: { role: "user", content: "x".repeat(600) } }));
+  const env = { ...process.env, AGENTMEM_HOME: home, PATH: path.dirname(process.execPath) };
+  assert.throws(() => execFileSync(process.execPath, [bin, "capture", transcript], { cwd: dir, env, stdio: "pipe" }));
+  const store = new Store(dir, home);
+  assert.match(fs.readFileSync(path.join(store.dir, "capture.log"), "utf8"), /"error":/);
+});
