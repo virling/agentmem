@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-28
+
 ### Added
 
 - Git worktrees (for example subagent worktrees under `.claude/worktrees/`) share the main checkout's memory store.
@@ -122,7 +124,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - MCP server over stdio with `memory_list`, `memory_search`, `memory_read`, `memory_write`, `memory_delete`.
 - Per-project storage in `~/.agentmem/<project-id>/`, keyed by the git remote URL.
 
-[Unreleased]: https://github.com/virling/agentmem/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/virling/agentmem/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/virling/agentmem/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/virling/agentmem/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/virling/agentmem/compare/v0.6.0...v0.6.2
 [0.6.0]: https://github.com/virling/agentmem/compare/v0.5.0...v0.6.0
